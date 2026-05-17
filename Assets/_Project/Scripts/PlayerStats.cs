@@ -1,5 +1,17 @@
 using UnityEngine;
 
+public enum PlayerStatType
+{
+    Strength,
+    Rage,
+    Reaction,
+    Agility,
+    Endurance,
+    Armor,
+    Luck,
+    Intelligence
+}
+
 public class PlayerStats : MonoBehaviour
 {
     [Header("Identity")]
@@ -43,6 +55,7 @@ public class PlayerStats : MonoBehaviour
     public int intelligencePerLevel = 1;
 
     [Header("Manual Stat Points")]
+    public int statPointsPerLevel = 5;
     public int availableStatPoints = 0;
 
     public int allocatedStrength = 0;
@@ -87,6 +100,7 @@ public class PlayerStats : MonoBehaviour
 
     private void Start()
     {
+        SyncAvailableStatPointsWithLevel();
         RecalculateStats();
 
         currentHp = maxHp;
@@ -161,9 +175,115 @@ public class PlayerStats : MonoBehaviour
     public void LevelUp()
     {
         level++;
-        availableStatPoints += 5;
+        availableStatPoints += statPointsPerLevel;
 
         RecalculateStats();
+    }
+
+    public void SyncAvailableStatPointsWithLevel()
+    {
+        int earnedPoints = Mathf.Max(level - 1, 0) * statPointsPerLevel;
+        int unspentPoints = earnedPoints - GetAllocatedStatPoints();
+
+        availableStatPoints = Mathf.Max(availableStatPoints, unspentPoints);
+    }
+
+    public int GetAllocatedStatPoints()
+    {
+        return allocatedStrength +
+               allocatedRage +
+               allocatedReaction +
+               allocatedAgility +
+               allocatedEndurance +
+               allocatedArmor +
+               allocatedLuck +
+               allocatedIntelligence;
+    }
+
+    public bool TryAllocateStat(PlayerStatType statType)
+    {
+        if (availableStatPoints <= 0)
+            return false;
+
+        switch (statType)
+        {
+            case PlayerStatType.Strength:
+                allocatedStrength++;
+                break;
+
+            case PlayerStatType.Rage:
+                allocatedRage++;
+                break;
+
+            case PlayerStatType.Reaction:
+                allocatedReaction++;
+                break;
+
+            case PlayerStatType.Agility:
+                allocatedAgility++;
+                break;
+
+            case PlayerStatType.Endurance:
+                allocatedEndurance++;
+                break;
+
+            case PlayerStatType.Armor:
+                allocatedArmor++;
+                break;
+
+            case PlayerStatType.Luck:
+                allocatedLuck++;
+                break;
+
+            case PlayerStatType.Intelligence:
+                allocatedIntelligence++;
+                break;
+        }
+
+        availableStatPoints--;
+        RecalculateStats();
+
+        return true;
+    }
+
+    public void AllocateStrength()
+    {
+        TryAllocateStat(PlayerStatType.Strength);
+    }
+
+    public void AllocateRage()
+    {
+        TryAllocateStat(PlayerStatType.Rage);
+    }
+
+    public void AllocateReaction()
+    {
+        TryAllocateStat(PlayerStatType.Reaction);
+    }
+
+    public void AllocateAgility()
+    {
+        TryAllocateStat(PlayerStatType.Agility);
+    }
+
+    public void AllocateEndurance()
+    {
+        TryAllocateStat(PlayerStatType.Endurance);
+    }
+
+    public void AllocateArmor()
+    {
+        TryAllocateStat(PlayerStatType.Armor);
+    }
+
+    public void AllocateLuck()
+    {
+        TryAllocateStat(PlayerStatType.Luck);
+    }
+
+    public void AllocateIntelligence()
+    {
+        TryAllocateStat(PlayerStatType.Intelligence);
     }
 
     private void CalculateCombatPower()

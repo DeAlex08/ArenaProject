@@ -355,6 +355,11 @@ public void UnequipWeapon2()
             FindFirstObjectByType<BarracksInventoryUI>()?.RefreshCurrentCategory();
     }
 
+    public void RefreshPlayerStats()
+    {
+        RecalculatePlayerStats();
+    }
+
     private void ApplyIfEquipped(ItemInstance itemInstance)
     {
         if (itemInstance != null && itemInstance.itemData != null)
