@@ -36,7 +36,7 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks and Arena.
 
-## Current Project State After Equipment Persistence
+## Current Project State After Combat Simulation v1
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -46,7 +46,12 @@ The project currently compiles at the script level and the main gameplay loop is
 - equipment bonuses are reapplied through `EquipmentManager.RefreshPlayerStats()`
 - CharacterPanel progression UI refreshes from `PlayerStats`
 - Barracks inventory/equipment UI continues to use existing item instances and equipment state
+- ArenaWindow opens from the city hub and shows three selectable enemies
+- selecting Fight runs Combat Simulation v1 through `CombatSimulator`
+- Arena ResultPanel shows Victory, Defeat, or Draw
+- Battle Log opens inside ArenaWindow and shows the full round-by-round combat log
 - Arena rewards still apply EXP and Arena Tokens through `PlayerStats`
+- Arena rewards still save through the existing progression/save system
 
 Current known limitations:
 
@@ -55,6 +60,10 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
+- Combat Simulation v1 has no animation layer yet
+- player combat stance is currently a serialized ArenaWindowUI setting, not a runtime player choice UI
+- shield blocking is supported in code but no shield item type/data exists yet
+- enemy generation and Arena rank progression are still static/manual
 
 ## Core Architecture
 
@@ -111,6 +120,18 @@ Current Arena features:
 - `BattleLogPanel` opens inside ArenaWindow from the ResultPanel Battle Log button
 - no real animated combat scene exists yet
 
+Important ArenaWindow responsibilities:
+
+- build and refresh Arena UI panels
+- convert configured Arena enemy data into `CombatSimulator.FighterData`
+- convert current `PlayerStats` into `CombatSimulator.FighterData`
+- call `CombatSimulator.Simulate(...)`
+- calculate and apply rewards based on combat outcome
+- keep ResultPanel, EnemyInfoPanel, and BattleLogPanel inside ArenaWindow
+- keep Continue behavior scoped to closing only ResultPanel
+- keep Battle Log behavior scoped to opening/closing only BattleLogPanel
+- do not apply stat/equipment/save logic directly outside existing `PlayerStats` and save flows
+
 ### CombatSimulator
 
 `CombatSimulator` owns Arena Combat Simulation v1.
@@ -140,6 +161,13 @@ Important behavior:
 - both fighters can die in the same round, causing Draw
 - if nobody dies after 20 rounds, higher remaining HP percentage wins
 - close remaining HP percentages produce Draw
+- body-zone damage modifiers are applied inside the simulator
+- dodge is based mainly on agility
+- counterattack chance is based mainly on reaction
+- crit chance uses explicit crit chance when available, otherwise safe luck-based fallback
+- armor/defense mitigation is applied before block mitigation
+- weapon block reduces roughly 50% damage
+- shield block reduces most damage and is prepared for future shield items
 - CombatSimulator does not apply rewards or save data directly
 - `ArenaWindowUI` remains responsible for UI flow and reward application
 
@@ -321,6 +349,8 @@ Current completed or working systems:
 - Arena `ResultPanel`
 - Arena `BattleLogPanel`
 - round-by-round combat log
+- Victory / Defeat / Draw Arena outcomes
+- Draw reward handling
 - EXP rewards from Arena
 - Arena Tokens rewards from Arena
 - level up from EXP
@@ -477,12 +507,17 @@ Combat Simulation v1:
 - both fighters act simultaneously each round
 - maximum duration is 20 rounds
 - attacks target one random body zone
+- supported body zones: Head, Body, Left Arm, Right Arm, Legs
 - dodge uses agility
 - counterattack chance uses reaction after dodge or block
 - crit chance uses configured enemy crit chance or player luck/rage fallback
 - mitigation uses defense, armor, body zone modifier, and block modifier
 - weapon block reduces roughly half of incoming damage
 - shield block support exists in `CombatSimulator`, but no shield item type exists yet
+- minimum landed damage is always at least 1
+- if nobody dies after 20 rounds, remaining HP percentage decides the winner
+- if remaining HP percentages are close enough, the result is Draw
+- if both fighters die in the same round, the result is Draw
 
 Combat stances:
 
@@ -495,6 +530,14 @@ Reward rules:
 - victory: full calculated EXP and full Arena Tokens
 - defeat: 25% calculated EXP, rounded to int, and 0 Arena Tokens
 - draw: 50% calculated EXP and 25% Arena Tokens, rounded to int
+
+Combat log behavior:
+
+- each fight generates a readable round-by-round log
+- the log includes stances, attack/block plans, target zones, dodges, blocks, crits, counters, damage, round-end HP, and final result
+- ResultPanel has a `Battle Log` button
+- BattleLogPanel is opened inside ArenaWindow
+- BattleLogPanel closes independently and does not close ResultPanel or ArenaWindow
 
 EXP reward multiplier:
 
@@ -559,12 +602,14 @@ Recommended next development direction:
 
 1. Add explicit New Game / Reset Progress debug UI
 2. Add save versioning / migration guard before save data grows further
-3. Add Arena enemy generation based on player combat power and rank
-4. Add Arena rank progression and token economy
-5. Add item rewards / loot drops and save them through `PlayerInventory.AddItem`
+3. Add Arena stance selection UI for the player
+4. Add Arena enemy generation based on player combat power and rank
+5. Add Arena rank progression and token economy
 
-After persistence is stable, good follow-up systems:
+Good follow-up systems:
 
 - Arena token shop
-- first real combat prototype
-- combat log or lightweight auto-battle visualization
+- item rewards / loot drops saved through `PlayerInventory.AddItem`
+- combat balance pass for dodge, block, crit, and damage formulas
+- lightweight auto-battle visualization or combat replay layer
+- shield item type / shield equipment slot if the design needs shield blocking
