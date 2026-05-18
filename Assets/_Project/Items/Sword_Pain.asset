@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3935fcde17e419bb8a58c4b683339e, type: 3}
   m_Name: Sword_Pain
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemId: Sword_Pain
   itemName: "\u041A\u043B\u0438\u043D\u043E\u043A \u0411\u043E\u043B\u0438"
   itemType: 1
   rarity: 3

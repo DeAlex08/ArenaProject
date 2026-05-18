@@ -263,7 +263,7 @@ Current completed or working systems:
 
 ## Progression And Save System v1
 
-Save System v1 is intentionally small and local-only.
+Save System v1 is intentionally small and local-only. It now stores player progression plus the first version of inventory/equipment state.
 
 Implemented:
 
@@ -271,24 +271,115 @@ Implemented:
 - JSON save file in `Application.persistentDataPath`
 - progression load during `PlayerStats.Start()`
 - progression save after EXP gain, token gain, level-up, and stat allocation
+- inventory item instance persistence
+- equipped item slot persistence
+- stable item IDs through `ItemData.itemId`
+- inventory/equipment load during `PlayerInventory.Start()`
+- equipment restore through `EquipmentManager.RestoreEquipmentFromSave`
+- save after equip / unequip
+- save after inventory add / remove
 - development reset through `PlayerStats` context menu
 
 Not implemented yet:
 
-- equipment persistence
-- inventory item instance persistence
 - save slots
 - cloud save
 - explicit new-game UI
+- save migration/versioning
 - encryption or anti-cheat protection
 
 Current limitation:
 
-The save system persists progression only. If the app restarts, equipment and inventory still depend on current scene/inspector/runtime state until equipment and inventory persistence are implemented.
+The save system is still one local player profile only. It has no explicit new-game UI, save slots, migration/version field, cloud save, encryption, or anti-cheat protection.
 
 Important safety note:
 
 After loading progression, equipment bonuses must still be applied through `EquipmentManager.RefreshPlayerStats()`. Do not apply equipment item bonuses directly from save code.
+
+## Equipment And Inventory Persistence v1
+
+Inventory source of truth:
+
+- `PlayerInventory.ownedItems`
+- each owned item is an `ItemInstance`
+- each `ItemInstance` stores `instanceId` and `itemData`
+
+Item ID strategy:
+
+- `ItemData.itemId` is the stable save identifier for item database entries.
+- Existing item assets now have explicit IDs:
+  - `Helmet_Long`
+  - `Helmet_Lord`
+  - `Sword_Pain`
+  - `Sword_Rage`
+- `ItemDatabase.GetStableItemId(item)` uses `item.itemId` first and falls back to the asset name.
+- `ItemDatabase.GetItemById(itemId)` resolves saved item IDs back to `ItemData`.
+
+Saved inventory format:
+
+```json
+"inventoryItems": [
+  {
+    "instanceId": "runtime-item-instance-guid",
+    "itemId": "Sword_Pain"
+  }
+]
+```
+
+Equipment source of truth:
+
+- `EquipmentManager` private equipped slot fields:
+  - `equippedHelmet`
+  - `equippedWeapon1`
+  - `equippedWeapon2`
+  - `equippedArmor`
+  - `equippedGloves`
+  - `equippedBelt`
+  - `equippedLegs`
+  - `equippedBoots`
+  - `equippedRing1` through `equippedRing4`
+  - `equippedAmulet`
+  - `equippedArtifact`
+
+Saved equipment format:
+
+```json
+"equipment": {
+  "helmet": "saved-item-instance-id",
+  "weapon1": "saved-item-instance-id",
+  "weapon2": "saved-item-instance-id",
+  "armor": "",
+  "gloves": "",
+  "belt": "",
+  "legs": "",
+  "boots": "",
+  "ring1": "",
+  "ring2": "",
+  "ring3": "",
+  "ring4": "",
+  "amulet": "",
+  "artifact": ""
+}
+```
+
+Load order:
+
+1. `PlayerStats.Start()` loads progression.
+2. `PlayerStats` recalculates base/native stats.
+3. `PlayerInventory.Start()` normalizes missing `ItemInstance.instanceId` values.
+4. `PlayerInventory` loads saved inventory item instances if save data exists.
+5. `EquipmentManager.RestoreEquipmentFromSave()` restores equipped slots by saved `instanceId`.
+6. `EquipmentManager.RefreshPlayerStats()` recalculates native stats and reapplies equipped item bonuses once.
+7. UI refresh is handled through the existing equipment refresh path.
+
+Duplicate and double-apply protection:
+
+- Inventory load clears `ownedItems` only when saved inventory data exists.
+- Duplicate saved `instanceId` entries are skipped.
+- Equipped slots are restored only by looking up items already loaded in `PlayerInventory`.
+- Saved equipment entries with missing items or wrong item type are ignored with `Debug.LogWarning`.
+- Equipment restore assigns equipped fields and refreshes stats once.
+- Save/load code does not call `PlayerStats.ApplyItemStats` directly.
 
 ## Arena Gameplay v1
 
@@ -380,11 +471,11 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Save System v2: persist inventory item instances
-2. Save System v2: persist equipped item instance IDs / equipment slot state
-3. Add explicit New Game / Reset Progress debug UI
-4. Add Arena enemy generation based on player combat power and rank
-5. Add Arena rank progression and token economy
+1. Add explicit New Game / Reset Progress debug UI
+2. Add save versioning / migration guard before save data grows further
+3. Add Arena enemy generation based on player combat power and rank
+4. Add Arena rank progression and token economy
+5. Add item rewards / loot drops and save them through `PlayerInventory.AddItem`
 
 After persistence is stable, good follow-up systems:
 

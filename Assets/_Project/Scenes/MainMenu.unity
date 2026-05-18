@@ -5006,6 +5006,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7fad55243b54c4441a21e604f15e0815, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerInventory
+  itemDatabase: {fileID: 11400000, guid: 2a0c10982ab0c40689baa857c5b94618, type: 2}
+  equipmentManager: {fileID: 2007480609}
   ownedItems:
   - instanceId: 
     itemData: {fileID: 11400000, guid: a8a7f25eadb904dfeb1d4195972780e2, type: 2}

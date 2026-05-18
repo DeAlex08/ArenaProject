@@ -20,4 +20,32 @@ public class ItemDatabase : ScriptableObject
 
         return result;
     }
+
+    public ItemData GetItemById(string itemId)
+    {
+        if (string.IsNullOrEmpty(itemId))
+            return null;
+
+        foreach (ItemData item in allItems)
+        {
+            if (item == null)
+                continue;
+
+            if (GetStableItemId(item) == itemId)
+                return item;
+        }
+
+        return null;
+    }
+
+    public static string GetStableItemId(ItemData item)
+    {
+        if (item == null)
+            return string.Empty;
+
+        if (!string.IsNullOrEmpty(item.itemId))
+            return item.itemId;
+
+        return item.name;
+    }
 }

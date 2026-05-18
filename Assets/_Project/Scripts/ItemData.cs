@@ -28,6 +28,7 @@ public enum ItemRarity
 public class ItemData : ScriptableObject
 {
     [Header("Main")]
+    public string itemId;
     public string itemName;
     public ItemType itemType;
     public ItemRarity rarity;

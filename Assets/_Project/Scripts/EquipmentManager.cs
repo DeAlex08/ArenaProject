@@ -181,7 +181,7 @@ public Image weaponVisualRight;
                 break;
         }
 
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipItem(ItemInstance itemInstance)
@@ -223,7 +223,7 @@ public Image weaponVisualRight;
     {
         equippedHelmet = null;
         ClearSlot(helmetSlot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
    public void UnequipWeapon1()
@@ -233,7 +233,7 @@ public Image weaponVisualRight;
     ClearSlot(weapon1Slot);
     ClearWeaponVisual(weaponVisualRight);
 
-    RecalculatePlayerStats();
+    RecalculatePlayerStatsAndSave();
 }
 
 public void UnequipWeapon2()
@@ -243,84 +243,142 @@ public void UnequipWeapon2()
     ClearSlot(weapon2Slot);
     ClearWeaponVisual(weaponVisualLeft);
 
-    RecalculatePlayerStats();
+    RecalculatePlayerStatsAndSave();
 }
 
     public void UnequipArmor()
     {
         equippedArmor = null;
         ClearSlot(armorSlot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipGloves()
     {
         equippedGloves = null;
         ClearSlot(glovesSlot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipBelt()
     {
         equippedBelt = null;
         ClearSlot(beltSlot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipLegs()
     {
         equippedLegs = null;
         ClearSlot(legsSlot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipBoots()
     {
         equippedBoots = null;
         ClearSlot(bootsSlot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipRing1()
     {
         equippedRing1 = null;
         ClearSlot(ring1Slot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipRing2()
     {
         equippedRing2 = null;
         ClearSlot(ring2Slot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipRing3()
     {
         equippedRing3 = null;
         ClearSlot(ring3Slot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipRing4()
     {
         equippedRing4 = null;
         ClearSlot(ring4Slot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipAmulet()
     {
         equippedAmulet = null;
         ClearSlot(amuletSlot);
-        RecalculatePlayerStats();
+        RecalculatePlayerStatsAndSave();
     }
 
     public void UnequipArtifact()
     {
         equippedArtifact = null;
         ClearSlot(artifactSlot);
+        RecalculatePlayerStatsAndSave();
+    }
+
+    public PlayerSaveManager.SavedEquipment BuildEquipmentSaveData()
+    {
+        return new PlayerSaveManager.SavedEquipment
+        {
+            helmet = GetInstanceId(equippedHelmet),
+            weapon1 = GetInstanceId(equippedWeapon1),
+            weapon2 = GetInstanceId(equippedWeapon2),
+            armor = GetInstanceId(equippedArmor),
+            gloves = GetInstanceId(equippedGloves),
+            belt = GetInstanceId(equippedBelt),
+            legs = GetInstanceId(equippedLegs),
+            boots = GetInstanceId(equippedBoots),
+            ring1 = GetInstanceId(equippedRing1),
+            ring2 = GetInstanceId(equippedRing2),
+            ring3 = GetInstanceId(equippedRing3),
+            ring4 = GetInstanceId(equippedRing4),
+            amulet = GetInstanceId(equippedAmulet),
+            artifact = GetInstanceId(equippedArtifact)
+        };
+    }
+
+    public void RestoreEquipmentFromSave(PlayerSaveManager.SavedEquipment savedEquipment, PlayerInventory inventory)
+    {
+        ClearEquippedState();
+
+        if (savedEquipment == null || inventory == null)
+        {
+            RefreshPlayerStats();
+            return;
+        }
+
+        equippedHelmet = GetSavedEquippedItem(savedEquipment.helmet, inventory, ItemType.Helmet, "Helmet");
+        equippedWeapon1 = GetSavedEquippedItem(savedEquipment.weapon1, inventory, ItemType.Weapon, "Weapon 1");
+        equippedWeapon2 = GetSavedEquippedItem(savedEquipment.weapon2, inventory, ItemType.Weapon, "Weapon 2");
+        equippedArmor = GetSavedEquippedItem(savedEquipment.armor, inventory, ItemType.Armor, "Armor");
+        equippedGloves = GetSavedEquippedItem(savedEquipment.gloves, inventory, ItemType.Gloves, "Gloves");
+        equippedBelt = GetSavedEquippedItem(savedEquipment.belt, inventory, ItemType.Belt, "Belt");
+        equippedLegs = GetSavedEquippedItem(savedEquipment.legs, inventory, ItemType.Legs, "Legs");
+        equippedBoots = GetSavedEquippedItem(savedEquipment.boots, inventory, ItemType.Boots, "Boots");
+        equippedRing1 = GetSavedEquippedItem(savedEquipment.ring1, inventory, ItemType.Ring, "Ring 1");
+        equippedRing2 = GetSavedEquippedItem(savedEquipment.ring2, inventory, ItemType.Ring, "Ring 2");
+        equippedRing3 = GetSavedEquippedItem(savedEquipment.ring3, inventory, ItemType.Ring, "Ring 3");
+        equippedRing4 = GetSavedEquippedItem(savedEquipment.ring4, inventory, ItemType.Ring, "Ring 4");
+        equippedAmulet = GetSavedEquippedItem(savedEquipment.amulet, inventory, ItemType.Amulet, "Amulet");
+        equippedArtifact = GetSavedEquippedItem(savedEquipment.artifact, inventory, ItemType.Artifact, "Artifact");
+
+        RestoreSlotVisuals();
+        RefreshPlayerStats();
+
+        Debug.Log("EquipmentManager: Restored equipment from save.");
+    }
+
+    private void RecalculatePlayerStatsAndSave()
+    {
         RecalculatePlayerStats();
+        SaveInventoryAndEquipment();
     }
 
     private void RecalculatePlayerStats()
@@ -362,10 +420,134 @@ public void UnequipWeapon2()
         RecalculatePlayerStats();
     }
 
+    private void SaveInventoryAndEquipment()
+    {
+        PlayerInventory inventory = FindPlayerInventory();
+
+        if (inventory != null)
+            PlayerSaveManager.SaveInventoryAndEquipment(inventory, this);
+    }
+
     private void ApplyIfEquipped(ItemInstance itemInstance)
     {
         if (itemInstance != null && itemInstance.itemData != null)
             playerStats.ApplyItemStats(itemInstance.itemData);
+    }
+
+    private PlayerInventory FindPlayerInventory()
+    {
+        PlayerInventory[] inventories = Resources.FindObjectsOfTypeAll<PlayerInventory>();
+
+        foreach (PlayerInventory inventory in inventories)
+        {
+            if (inventory != null && inventory.gameObject.scene.IsValid())
+                return inventory;
+        }
+
+        return null;
+    }
+
+    private string GetInstanceId(ItemInstance itemInstance)
+    {
+        if (itemInstance == null)
+            return string.Empty;
+
+        itemInstance.EnsureInstanceId();
+        return itemInstance.instanceId;
+    }
+
+    private ItemInstance GetSavedEquippedItem(string instanceId, PlayerInventory inventory, ItemType expectedType, string slotName)
+    {
+        if (string.IsNullOrEmpty(instanceId))
+            return null;
+
+        ItemInstance itemInstance = inventory.GetItemByInstanceId(instanceId);
+
+        if (itemInstance == null || itemInstance.itemData == null)
+        {
+            Debug.LogWarning("EquipmentManager: Saved " + slotName + " item was not found in loaded inventory.");
+            return null;
+        }
+
+        if (itemInstance.itemData.itemType != expectedType)
+        {
+            Debug.LogWarning("EquipmentManager: Saved " + slotName + " item has wrong type and will be ignored.");
+            return null;
+        }
+
+        return itemInstance;
+    }
+
+    private void ClearEquippedState()
+    {
+        equippedHelmet = null;
+        equippedWeapon1 = null;
+        equippedWeapon2 = null;
+        equippedArmor = null;
+        equippedGloves = null;
+        equippedBelt = null;
+        equippedLegs = null;
+        equippedBoots = null;
+        equippedRing1 = null;
+        equippedRing2 = null;
+        equippedRing3 = null;
+        equippedRing4 = null;
+        equippedAmulet = null;
+        equippedArtifact = null;
+
+        ClearSlot(helmetSlot);
+        ClearSlot(weapon1Slot);
+        ClearSlot(weapon2Slot);
+        ClearSlot(armorSlot);
+        ClearSlot(glovesSlot);
+        ClearSlot(beltSlot);
+        ClearSlot(legsSlot);
+        ClearSlot(bootsSlot);
+        ClearSlot(ring1Slot);
+        ClearSlot(ring2Slot);
+        ClearSlot(ring3Slot);
+        ClearSlot(ring4Slot);
+        ClearSlot(amuletSlot);
+        ClearSlot(artifactSlot);
+        ClearWeaponVisual(weaponVisualLeft);
+        ClearWeaponVisual(weaponVisualRight);
+    }
+
+    private void RestoreSlotVisuals()
+    {
+        RestoreSlotVisual(helmetSlot, equippedHelmet);
+        RestoreSlotVisual(weapon1Slot, equippedWeapon1);
+        RestoreSlotVisual(weapon2Slot, equippedWeapon2);
+        RestoreSlotVisual(armorSlot, equippedArmor);
+        RestoreSlotVisual(glovesSlot, equippedGloves);
+        RestoreSlotVisual(beltSlot, equippedBelt);
+        RestoreSlotVisual(legsSlot, equippedLegs);
+        RestoreSlotVisual(bootsSlot, equippedBoots);
+        RestoreSlotVisual(ring1Slot, equippedRing1);
+        RestoreSlotVisual(ring2Slot, equippedRing2);
+        RestoreSlotVisual(ring3Slot, equippedRing3);
+        RestoreSlotVisual(ring4Slot, equippedRing4);
+        RestoreSlotVisual(amuletSlot, equippedAmulet);
+        RestoreSlotVisual(artifactSlot, equippedArtifact);
+
+        RestoreWeaponVisual(weaponVisualRight, equippedWeapon1);
+        RestoreWeaponVisual(weaponVisualLeft, equippedWeapon2);
+    }
+
+    private void RestoreSlotVisual(Image slot, ItemInstance itemInstance)
+    {
+        if (itemInstance != null && itemInstance.itemData != null && itemInstance.itemData.icon != null)
+            EquipToSlot(slot, itemInstance.itemData.icon);
+        else
+            ClearSlot(slot);
+    }
+
+    private void RestoreWeaponVisual(Image visual, ItemInstance itemInstance)
+    {
+        if (itemInstance != null && itemInstance.itemData != null && itemInstance.itemData.icon != null)
+            EquipWeaponVisual(visual, itemInstance.itemData.icon);
+        else
+            ClearWeaponVisual(visual);
     }
 
     private void EquipToSlot(Image slot, Sprite icon)

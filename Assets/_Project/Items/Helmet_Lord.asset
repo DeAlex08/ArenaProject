@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd3935fcde17e419bb8a58c4b683339e, type: 3}
   m_Name: Helmet_Lord
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemId: Helmet_Lord
   itemName: "\u0428\u043B\u0435\u043C \u0412\u043B\u0430\u0434\u044B\u043A\u0438"
   itemType: 0
   rarity: 4

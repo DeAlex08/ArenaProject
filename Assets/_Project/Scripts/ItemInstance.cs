@@ -12,4 +12,18 @@ public class ItemInstance
         this.itemData = itemData;
         instanceId = Guid.NewGuid().ToString();
     }
+
+    public ItemInstance(ItemData itemData, string instanceId)
+    {
+        this.itemData = itemData;
+        this.instanceId = string.IsNullOrEmpty(instanceId)
+            ? Guid.NewGuid().ToString()
+            : instanceId;
+    }
+
+    public void EnsureInstanceId()
+    {
+        if (string.IsNullOrEmpty(instanceId))
+            instanceId = Guid.NewGuid().ToString();
+    }
 }
