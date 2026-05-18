@@ -107,8 +107,41 @@ Current Arena features:
 - contains three enemy cards
 - each enemy has a portrait placeholder, name, level, combat power, EXP reward, Arena Tokens reward, Info button, and Fight button
 - `EnemyInfoPanel` opens inside ArenaWindow for selected enemy details
-- `ResultPanel` opens inside ArenaWindow after pseudo fight
+- `ResultPanel` opens inside ArenaWindow after Combat Simulation v1
+- `BattleLogPanel` opens inside ArenaWindow from the ResultPanel Battle Log button
 - no real animated combat scene exists yet
+
+### CombatSimulator
+
+`CombatSimulator` owns Arena Combat Simulation v1.
+
+Responsibilities:
+
+- simulate Arena fights outside `ArenaWindowUI`
+- run turn-based rounds
+- resolve simultaneous attacks
+- support body zones:
+  - Head
+  - Body
+  - Left Arm
+  - Right Arm
+  - Legs
+- support combat stances:
+  - Aggressive
+  - Standard
+  - Defensive
+- support weapon block now and shield block later
+- calculate dodge, block, crit, damage mitigation, and simple counterattacks
+- produce a full readable combat log
+
+Important behavior:
+
+- max fight duration is 20 rounds
+- both fighters can die in the same round, causing Draw
+- if nobody dies after 20 rounds, higher remaining HP percentage wins
+- close remaining HP percentages produce Draw
+- CombatSimulator does not apply rewards or save data directly
+- `ArenaWindowUI` remains responsible for UI flow and reward application
 
 ### PlayerStats
 
@@ -284,8 +317,10 @@ Current completed or working systems:
 - ArenaWindow v1
 - Arena enemy cards
 - Arena `EnemyInfoPanel`
-- Arena pseudo fight calculation
+- Arena Combat Simulation v1
 - Arena `ResultPanel`
+- Arena `BattleLogPanel`
+- round-by-round combat log
 - EXP rewards from Arena
 - Arena Tokens rewards from Arena
 - level up from EXP
@@ -436,19 +471,30 @@ Arena enemies currently contain:
 - Arena Tokens reward
 - short description
 
-Pseudo fight formula:
+Combat Simulation v1:
 
-- use `playerStats.combatPower` if available and greater than 0
-- otherwise use fallback player power
-- `finalPlayerPower = playerPower * Random.Range(0.9, 1.1)`
-- `finalEnemyPower = enemyPower * Random.Range(0.9, 1.1)`
-- victory if `finalPlayerPower >= finalEnemyPower`
-- defeat otherwise
+- fights are turn-based by rounds
+- both fighters act simultaneously each round
+- maximum duration is 20 rounds
+- attacks target one random body zone
+- dodge uses agility
+- counterattack chance uses reaction after dodge or block
+- crit chance uses configured enemy crit chance or player luck/rage fallback
+- mitigation uses defense, armor, body zone modifier, and block modifier
+- weapon block reduces roughly half of incoming damage
+- shield block support exists in `CombatSimulator`, but no shield item type exists yet
+
+Combat stances:
+
+- Aggressive: attacks with both hands and does not block
+- Standard: attacks once and blocks 2 random body zones
+- Defensive: 75% chance to full block 4 random zones, 25% chance to attack once
 
 Reward rules:
 
 - victory: full calculated EXP and full Arena Tokens
 - defeat: 25% calculated EXP, rounded to int, and 0 Arena Tokens
+- draw: 50% calculated EXP and 25% Arena Tokens, rounded to int
 
 EXP reward multiplier:
 

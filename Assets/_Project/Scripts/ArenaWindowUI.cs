@@ -6,11 +6,17 @@ public class ArenaWindowUI : MonoBehaviour
 {
     private struct ArenaFightResult
     {
-        public bool isVictory;
+        public CombatOutcome outcome;
         public int finalPlayerPower;
         public int finalEnemyPower;
+        public int playerRemainingHp;
+        public int playerStartHp;
+        public int enemyRemainingHp;
+        public int enemyStartHp;
         public int expGained;
         public int tokensGained;
+        public int rounds;
+        public string combatLog;
     }
 
     [System.Serializable]
@@ -38,6 +44,7 @@ public class ArenaWindowUI : MonoBehaviour
     [Header("Arena State")]
     [SerializeField] private string rank = "Bronze III";
     [SerializeField] private int arenaTokens = 0;
+    [SerializeField] private CombatStance playerStance = CombatStance.Standard;
 
     [Header("Enemy Previews")]
     [SerializeField] private ArenaEnemyData[] enemies =
@@ -105,8 +112,11 @@ public class ArenaWindowUI : MonoBehaviour
     private TMP_Text resultExpText;
     private TMP_Text resultTokensText;
     private TMP_Text resultMessageText;
+    private GameObject battleLogPanel;
+    private TMP_Text battleLogText;
     private TMP_Text arenaTokensText;
     private int selectedEnemyIndex = -1;
+    private string lastBattleLog = "";
 
     private readonly Color panelColor = new Color(0.015f, 0.013f, 0.012f, 0.985f);
     private readonly Color cardColor = new Color(0.09f, 0.075f, 0.06f, 0.98f);
@@ -131,6 +141,7 @@ public class ArenaWindowUI : MonoBehaviour
         RefreshArenaTokensText();
         HideEnemyInfo();
         HideResult();
+        HideBattleLog();
     }
 
     public void Close()
@@ -156,7 +167,7 @@ public class ArenaWindowUI : MonoBehaviour
 
         Debug.Log(
             "ArenaWindowUI: Fight result: " +
-            (result.isVictory ? "Victory" : "Defeat") +
+            result.outcome +
             " | Enemy: " +
             enemy.enemyName +
             " | Level: " + enemy.level +
@@ -202,6 +213,7 @@ public class ArenaWindowUI : MonoBehaviour
         BuildEnemies();
         BuildEnemyInfoPanel();
         BuildResultPanel();
+        BuildBattleLogPanel();
     }
 
     private void BuildHeader()
@@ -481,11 +493,117 @@ public class ArenaWindowUI : MonoBehaviour
         GameObject spacer = CreateLayoutObject("Spacer", resultPanel.transform);
         spacer.AddComponent<LayoutElement>().flexibleHeight = 1f;
 
-        Button continueButton = CreateButton("ContinueButton", resultPanel.transform, "Continue", 30, new Vector2(0f, 78f), buttonColor);
+        GameObject actions = CreateLayoutObject("Actions", resultPanel.transform);
+        HorizontalLayoutGroup actionsLayout = actions.AddComponent<HorizontalLayoutGroup>();
+        actionsLayout.spacing = 24f;
+        actionsLayout.childAlignment = TextAnchor.MiddleCenter;
+        actionsLayout.childControlWidth = true;
+        actionsLayout.childControlHeight = true;
+        actionsLayout.childForceExpandWidth = true;
+        actionsLayout.childForceExpandHeight = false;
+        actions.AddComponent<LayoutElement>().preferredHeight = 78f;
+
+        Button battleLogButton = CreateButton("BattleLogButton", actions.transform, "Battle Log", 26, new Vector2(0f, 78f), closeButtonColor);
+        battleLogButton.gameObject.GetComponent<LayoutElement>().flexibleWidth = 1f;
+        battleLogButton.onClick.AddListener(ShowBattleLog);
+
+        Button continueButton = CreateButton("ContinueButton", actions.transform, "Continue", 30, new Vector2(0f, 78f), buttonColor);
         continueButton.gameObject.GetComponent<LayoutElement>().flexibleWidth = 1f;
         continueButton.onClick.AddListener(HideResult);
 
         HideResult();
+    }
+
+    private void BuildBattleLogPanel()
+    {
+        battleLogPanel = CreateLayoutObject("BattleLogPanel", transform);
+        LayoutElement ignoreLayout = battleLogPanel.AddComponent<LayoutElement>();
+        ignoreLayout.ignoreLayout = true;
+
+        Image panelImage = battleLogPanel.AddComponent<Image>();
+        panelImage.color = new Color(0.018f, 0.015f, 0.012f, 0.995f);
+        AddOutline(battleLogPanel, borderColor, new Vector2(2f, -2f));
+
+        RectTransform rect = battleLogPanel.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(1040f, 900f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+
+        VerticalLayoutGroup layout = battleLogPanel.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(42, 42, 34, 38);
+        layout.spacing = 18f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        GameObject header = CreateLayoutObject("Header", battleLogPanel.transform);
+        HorizontalLayoutGroup headerLayout = header.AddComponent<HorizontalLayoutGroup>();
+        headerLayout.childAlignment = TextAnchor.MiddleCenter;
+        headerLayout.childControlWidth = true;
+        headerLayout.childControlHeight = true;
+        headerLayout.childForceExpandWidth = false;
+        headerLayout.childForceExpandHeight = false;
+        header.AddComponent<LayoutElement>().preferredHeight = 62f;
+
+        TMP_Text title = CreateText("Title", header.transform, "BATTLE LOG", 36, FontStyles.Bold, TextAlignmentOptions.Center);
+        title.color = titleColor;
+        title.gameObject.GetComponent<LayoutElement>().flexibleWidth = 1f;
+
+        Button closeButton = CreateButton("CloseButton", header.transform, "X", 24, new Vector2(54f, 50f), closeButtonColor);
+        closeButton.onClick.AddListener(HideBattleLog);
+
+        GameObject scrollObject = CreateLayoutObject("ScrollView", battleLogPanel.transform);
+        Image scrollImage = scrollObject.AddComponent<Image>();
+        scrollImage.color = new Color(0.035f, 0.028f, 0.022f, 0.96f);
+        AddOutline(scrollObject, darkBorderColor, new Vector2(2f, -2f));
+        ScrollRect scrollRect = scrollObject.AddComponent<ScrollRect>();
+        scrollRect.horizontal = false;
+        scrollRect.vertical = true;
+        scrollObject.AddComponent<LayoutElement>().preferredHeight = 690f;
+
+        GameObject viewport = CreateLayoutObject("Viewport", scrollObject.transform);
+        RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+        viewportRect.anchorMin = Vector2.zero;
+        viewportRect.anchorMax = Vector2.one;
+        viewportRect.offsetMin = new Vector2(18f, 18f);
+        viewportRect.offsetMax = new Vector2(-18f, -18f);
+        Image viewportImage = viewport.AddComponent<Image>();
+        viewportImage.color = new Color(0f, 0f, 0f, 0.01f);
+        Mask mask = viewport.AddComponent<Mask>();
+        mask.showMaskGraphic = false;
+
+        GameObject content = CreateLayoutObject("Content", viewport.transform);
+        RectTransform contentRect = content.GetComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0f, 1f);
+        contentRect.anchorMax = new Vector2(1f, 1f);
+        contentRect.pivot = new Vector2(0.5f, 1f);
+        contentRect.offsetMin = Vector2.zero;
+        contentRect.offsetMax = Vector2.zero;
+        VerticalLayoutGroup contentLayout = content.AddComponent<VerticalLayoutGroup>();
+        contentLayout.childControlWidth = true;
+        contentLayout.childControlHeight = true;
+        contentLayout.childForceExpandWidth = true;
+        contentLayout.childForceExpandHeight = false;
+        ContentSizeFitter fitter = content.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        battleLogText = CreateText("LogText", content.transform, "", 24, FontStyles.Normal, TextAlignmentOptions.TopLeft);
+        battleLogText.color = textColor;
+        battleLogText.textWrappingMode = TextWrappingModes.Normal;
+        battleLogText.gameObject.GetComponent<LayoutElement>().preferredHeight = 5000f;
+
+        scrollRect.viewport = viewportRect;
+        scrollRect.content = contentRect;
+
+        Button closeLogButton = CreateButton("CloseLogButton", battleLogPanel.transform, "Close", 28, new Vector2(0f, 76f), buttonColor);
+        closeLogButton.gameObject.GetComponent<LayoutElement>().flexibleWidth = 1f;
+        closeLogButton.onClick.AddListener(HideBattleLog);
+
+        HideBattleLog();
     }
 
     private TMP_Text CreateResultLine(string objectName)
@@ -538,19 +656,45 @@ public class ArenaWindowUI : MonoBehaviour
 
     private ArenaFightResult RunPseudoBattle(ArenaEnemyData enemy)
     {
-        int playerPower = GetPlayerPower();
-        int finalPlayerPower = Mathf.RoundToInt(playerPower * Random.Range(0.9f, 1.1f));
-        int finalEnemyPower = Mathf.RoundToInt(enemy.combatPower * Random.Range(0.9f, 1.1f));
-        bool isVictory = finalPlayerPower >= finalEnemyPower;
+        CombatSimulator.CombatResult combatResult = CombatSimulator.Simulate(
+            BuildPlayerCombatant(),
+            BuildEnemyCombatant(enemy));
+
         int calculatedExpReward = CalculateExpReward(enemy);
+        int expGained = 0;
+        int tokensGained = 0;
+
+        switch (combatResult.outcome)
+        {
+            case CombatOutcome.Victory:
+                expGained = calculatedExpReward;
+                tokensGained = enemy.tokenReward;
+                break;
+
+            case CombatOutcome.Draw:
+                expGained = Mathf.RoundToInt(calculatedExpReward * 0.5f);
+                tokensGained = Mathf.RoundToInt(enemy.tokenReward * 0.25f);
+                break;
+
+            default:
+                expGained = Mathf.RoundToInt(calculatedExpReward * 0.25f);
+                tokensGained = 0;
+                break;
+        }
 
         ArenaFightResult result = new ArenaFightResult
         {
-            isVictory = isVictory,
-            finalPlayerPower = finalPlayerPower,
-            finalEnemyPower = finalEnemyPower,
-            expGained = isVictory ? calculatedExpReward : Mathf.RoundToInt(calculatedExpReward * 0.25f),
-            tokensGained = isVictory ? enemy.tokenReward : 0
+            outcome = combatResult.outcome,
+            finalPlayerPower = combatResult.playerFinalPower,
+            finalEnemyPower = combatResult.enemyFinalPower,
+            playerRemainingHp = combatResult.playerRemainingHp,
+            playerStartHp = combatResult.playerStartHp,
+            enemyRemainingHp = combatResult.enemyRemainingHp,
+            enemyStartHp = combatResult.enemyStartHp,
+            expGained = expGained,
+            tokensGained = tokensGained,
+            rounds = combatResult.rounds,
+            combatLog = combatResult.combatLog
         };
 
         return result;
@@ -558,17 +702,17 @@ public class ArenaWindowUI : MonoBehaviour
 
     private void ShowResult(ArenaEnemyData enemy, ArenaFightResult result)
     {
-        resultTitleText.text = result.isVictory ? "VICTORY" : "DEFEAT";
-        resultTitleText.color = result.isVictory ? titleColor : new Color(0.74f, 0.18f, 0.13f, 1f);
+        lastBattleLog = string.IsNullOrEmpty(result.combatLog) ? "No battle log available." : result.combatLog;
+        resultTitleText.text = GetResultTitle(result.outcome);
+        resultTitleText.color = GetResultColor(result.outcome);
         resultEnemyText.text = "Enemy: " + enemy.enemyName;
         resultPlayerPowerText.text = "Player Final Power: " + result.finalPlayerPower;
         resultEnemyPowerText.text = "Enemy Final Power: " + result.finalEnemyPower;
         resultExpText.text = "EXP Gained: " + result.expGained;
         resultTokensText.text = "Arena Tokens Gained: " + result.tokensGained;
-        resultMessageText.text = result.isVictory
-            ? "The crowd roars as your challenger falls. Rewards are ready for the next Arena progression pass."
-            : "You survive the duel, but the Arena grants only a small lesson for this defeat.";
+        resultMessageText.text = BuildResultMessage(result, enemy);
 
+        HideBattleLog();
         resultPanel.SetActive(true);
     }
 
@@ -679,6 +823,146 @@ public class ArenaWindowUI : MonoBehaviour
     {
         if (resultPanel != null)
             resultPanel.SetActive(false);
+    }
+
+    private void ShowBattleLog()
+    {
+        if (battleLogText != null)
+            battleLogText.text = lastBattleLog;
+
+        if (battleLogPanel != null)
+            battleLogPanel.SetActive(true);
+    }
+
+    private void HideBattleLog()
+    {
+        if (battleLogPanel != null)
+            battleLogPanel.SetActive(false);
+    }
+
+    private string GetResultTitle(CombatOutcome outcome)
+    {
+        switch (outcome)
+        {
+            case CombatOutcome.Victory:
+                return "VICTORY";
+            case CombatOutcome.Draw:
+                return "DRAW";
+            default:
+                return "DEFEAT";
+        }
+    }
+
+    private Color GetResultColor(CombatOutcome outcome)
+    {
+        switch (outcome)
+        {
+            case CombatOutcome.Victory:
+                return titleColor;
+            case CombatOutcome.Draw:
+                return new Color(0.82f, 0.72f, 0.46f, 1f);
+            default:
+                return new Color(0.74f, 0.18f, 0.13f, 1f);
+        }
+    }
+
+    private string BuildResultMessage(ArenaFightResult result, ArenaEnemyData enemy)
+    {
+        string hpLine =
+            "Rounds: " +
+            result.rounds +
+            " | HP: " +
+            result.playerRemainingHp +
+            "/" +
+            result.playerStartHp +
+            " vs " +
+            result.enemyRemainingHp +
+            "/" +
+            result.enemyStartHp +
+            ". ";
+
+        switch (result.outcome)
+        {
+            case CombatOutcome.Victory:
+                return hpLine + "The crowd roars as " + enemy.enemyName + " falls.";
+            case CombatOutcome.Draw:
+                return hpLine + "Both fighters survive the clash. The Arena grants partial rewards.";
+            default:
+                return hpLine + "You survive the duel, but the Arena grants only a small lesson for this defeat.";
+        }
+    }
+
+    private CombatSimulator.FighterData BuildPlayerCombatant()
+    {
+        int playerPower = GetPlayerPower();
+
+        if (playerStats == null)
+        {
+            return new CombatSimulator.FighterData
+            {
+                fighterName = "Player",
+                level = 1,
+                maxHp = Mathf.Max(playerPower / 5, 100),
+                attack = Mathf.Max(playerPower / 45, 20),
+                defense = Mathf.Max(playerPower / 90, 5),
+                combatPower = playerPower,
+                critChance = 5f,
+                stance = playerStance,
+                blockType = CombatBlockType.Weapon
+            };
+        }
+
+        return new CombatSimulator.FighterData
+        {
+            fighterName = playerStats.playerName,
+            level = playerStats.level,
+            maxHp = Mathf.Max(playerStats.maxHp, 1),
+            attack = Mathf.Max(playerStats.strength * 2 + playerStats.rage + playerStats.combatPower / 70, 1),
+            defense = Mathf.Max(playerStats.armor, 0),
+            strength = playerStats.strength,
+            rage = playerStats.rage,
+            reaction = playerStats.reaction,
+            agility = playerStats.agility,
+            armor = playerStats.armor,
+            luck = playerStats.luck,
+            combatPower = Mathf.Max(playerStats.combatPower, playerPower),
+            critChance = Mathf.Clamp(5f + playerStats.luck * 0.15f + playerStats.rage * 0.05f, 2f, 45f),
+            stance = playerStance,
+            blockType = CombatBlockType.Weapon
+        };
+    }
+
+    private CombatSimulator.FighterData BuildEnemyCombatant(ArenaEnemyData enemy)
+    {
+        return new CombatSimulator.FighterData
+        {
+            fighterName = enemy.enemyName,
+            level = enemy.level,
+            maxHp = Mathf.Max(enemy.hp, 1),
+            attack = Mathf.Max(enemy.attack, 1),
+            defense = Mathf.Max(enemy.defense, 0),
+            strength = Mathf.Max(enemy.attack / 4, 1),
+            rage = Mathf.Max(enemy.attack / 8, 1),
+            reaction = Mathf.Max(enemy.level + enemy.combatPower / 260, 1),
+            agility = Mathf.Max(enemy.level + enemy.combatPower / 300, 1),
+            armor = Mathf.Max(enemy.defense, 0),
+            luck = Mathf.Max(Mathf.RoundToInt(enemy.critChance), 1),
+            combatPower = Mathf.Max(enemy.combatPower, 1),
+            critChance = Mathf.Max(enemy.critChance, 2f),
+            stance = GetEnemyStance(enemy),
+            blockType = CombatBlockType.Weapon
+        };
+    }
+
+    private CombatStance GetEnemyStance(ArenaEnemyData enemy)
+    {
+        if (enemy.combatPower >= GetPlayerPower() * 1.2f)
+            return CombatStance.Defensive;
+
+        if (enemy.attack > enemy.defense * 2)
+            return CombatStance.Aggressive;
+
+        return CombatStance.Standard;
     }
 
     private int CalculateExpReward(ArenaEnemyData enemy)
