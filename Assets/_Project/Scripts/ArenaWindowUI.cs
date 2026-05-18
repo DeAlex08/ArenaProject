@@ -4,6 +4,13 @@ using UnityEngine.UI;
 
 public class ArenaWindowUI : MonoBehaviour
 {
+    private enum ArenaEnemyDifficulty
+    {
+        Easy,
+        Balanced,
+        Hard
+    }
+
     private struct ArenaFightResult
     {
         public CombatOutcome outcome;
@@ -38,6 +45,9 @@ public class ArenaWindowUI : MonoBehaviour
         public int hp = 500;
         public int attack = 80;
         public int defense = 30;
+        public int armor = 30;
+        public int agility = 10;
+        public int reaction = 10;
         public float critChance = 5f;
         public int baseExpReward = 25;
         public int tokenReward = 10;
@@ -56,51 +66,11 @@ public class ArenaWindowUI : MonoBehaviour
     [SerializeField] private int arenaTokens = 0;
     [SerializeField] private CombatStance playerStance = CombatStance.Standard;
 
-    [Header("Enemy Previews")]
-    [SerializeField] private ArenaEnemyData[] enemies =
-    {
-        new ArenaEnemyData
-        {
-            enemyName = "Grave Duelist",
-            level = 9,
-            combatPower = 1800,
-            hp = 740,
-            attack = 110,
-            defense = 38,
-            critChance = 7.5f,
-            baseExpReward = 30,
-            tokenReward = 10,
-            description = "A silent blade from the old burial pits. Fast, disciplined, and difficult to read."
-        },
-        new ArenaEnemyData
-        {
-            enemyName = "Ash Knight",
-            level = 12,
-            combatPower = 3200,
-            hp = 1180,
-            attack = 165,
-            defense = 72,
-            critChance = 9f,
-            baseExpReward = 45,
-            tokenReward = 16,
-            description = "A burned champion in cracked plate armor. Slow to start, brutal once close."
-        },
-        new ArenaEnemyData
-        {
-            enemyName = "Blood Champion",
-            level = 15,
-            combatPower = 6200,
-            hp = 1680,
-            attack = 240,
-            defense = 104,
-            critChance = 13.5f,
-            baseExpReward = 70,
-            tokenReward = 25,
-            description = "A feared crowd favorite who turns every duel into a public execution."
-        }
-    };
+    [Header("Generated Enemies")]
+    [SerializeField] private ArenaEnemyData[] enemies;
 
     private bool isBuilt;
+    private Transform enemyCardsRoot;
     private GameObject enemyInfoPanel;
     private TMP_Text infoTitleText;
     private TMP_Text infoPortraitMarkText;
@@ -109,6 +79,8 @@ public class ArenaWindowUI : MonoBehaviour
     private TMP_Text infoHpText;
     private TMP_Text infoAttackText;
     private TMP_Text infoDefenseText;
+    private TMP_Text infoAgilityText;
+    private TMP_Text infoReactionText;
     private TMP_Text infoCritText;
     private TMP_Text infoExpText;
     private TMP_Text infoTokenText;
@@ -149,18 +121,22 @@ public class ArenaWindowUI : MonoBehaviour
     private void Awake()
     {
         LoadSavedPlayerStance();
+        GenerateEnemies();
         BuildIfNeeded();
     }
 
     private void OnEnable()
     {
         LoadSavedPlayerStance();
+        GenerateEnemies();
         BuildIfNeeded();
+        RefreshEnemyCards();
         RefreshStanceButtons();
         RefreshArenaTokensText();
         HideEnemyInfo();
         HideResult();
         HideBattleLog();
+        selectedEnemyIndex = -1;
     }
 
     public void Close()
@@ -277,6 +253,9 @@ public class ArenaWindowUI : MonoBehaviour
 
         CreateStatusLabel("RankText", summary.transform, "Rank: " + rank);
         arenaTokensText = CreateStatusLabel("ArenaTokensText", summary.transform, BuildArenaTokensText());
+
+        Button refreshButton = CreateButton("RefreshOpponentsButton", summary.transform, "Refresh Opponents", 22, new Vector2(300f, 54f), closeButtonColor);
+        refreshButton.onClick.AddListener(RefreshOpponents);
     }
 
     private void BuildStanceSelector()
@@ -335,11 +314,39 @@ public class ArenaWindowUI : MonoBehaviour
         listElement.preferredHeight = 610f;
         listElement.flexibleHeight = 1f;
 
+        enemyCardsRoot = list.transform;
+        RefreshEnemyCards();
+    }
+
+    private void RefreshEnemyCards()
+    {
+        if (enemyCardsRoot == null)
+            return;
+
+        for (int i = enemyCardsRoot.childCount - 1; i >= 0; i--)
+        {
+            GameObject child = enemyCardsRoot.GetChild(i).gameObject;
+            child.SetActive(false);
+            Destroy(child);
+        }
+
         int enemyCount = enemies != null ? enemies.Length : 0;
         for (int i = 0; i < enemyCount; i++)
         {
-            BuildEnemyCard(list.transform, enemies[i], i);
+            BuildEnemyCard(enemyCardsRoot, enemies[i], i);
         }
+    }
+
+    public void RefreshOpponents()
+    {
+        GenerateEnemies();
+        RefreshEnemyCards();
+        HideEnemyInfo();
+        HideResult();
+        HideBattleLog();
+        selectedEnemyIndex = -1;
+
+        Debug.Log("ArenaWindowUI: Refreshed generated Arena opponents.");
     }
 
     private void BuildEnemyCard(Transform parent, ArenaEnemyData enemy, int enemyIndex)
@@ -482,6 +489,8 @@ public class ArenaWindowUI : MonoBehaviour
         infoHpText = CreateInfoLine("HpText", stats.transform);
         infoAttackText = CreateInfoLine("AttackText", stats.transform);
         infoDefenseText = CreateInfoLine("DefenseText", stats.transform);
+        infoAgilityText = CreateInfoLine("AgilityText", stats.transform);
+        infoReactionText = CreateInfoLine("ReactionText", stats.transform);
         infoCritText = CreateInfoLine("CritText", stats.transform);
         infoExpText = CreateInfoLine("ExpText", stats.transform);
         infoTokenText = CreateInfoLine("TokenText", stats.transform);
@@ -699,7 +708,9 @@ public class ArenaWindowUI : MonoBehaviour
         infoPowerText.text = "Combat Power: " + enemy.combatPower;
         infoHpText.text = "HP: " + enemy.hp;
         infoAttackText.text = "Attack: " + enemy.attack;
-        infoDefenseText.text = "Defense: " + enemy.defense;
+        infoDefenseText.text = "Defense / Armor: " + enemy.defense + " / " + enemy.armor;
+        infoAgilityText.text = "Agility: " + enemy.agility;
+        infoReactionText.text = "Reaction: " + enemy.reaction;
         infoCritText.text = "Crit Chance: " + enemy.critChance.ToString("0.#") + "%";
         infoExpText.text = "EXP Reward: " + expReward;
         infoTokenText.text = "Arena Tokens: " + enemy.tokenReward;
@@ -1063,9 +1074,9 @@ public class ArenaWindowUI : MonoBehaviour
             defense = Mathf.Max(enemy.defense, 0),
             strength = Mathf.Max(enemy.attack / 4, 1),
             rage = Mathf.Max(enemy.attack / 8, 1),
-            reaction = Mathf.Max(enemy.level + enemy.combatPower / 260, 1),
-            agility = Mathf.Max(enemy.level + enemy.combatPower / 300, 1),
-            armor = Mathf.Max(enemy.defense, 0),
+            reaction = Mathf.Max(enemy.reaction, 1),
+            agility = Mathf.Max(enemy.agility, 1),
+            armor = Mathf.Max(enemy.armor, 0),
             luck = Mathf.Max(Mathf.RoundToInt(enemy.critChance), 1),
             combatPower = Mathf.Max(enemy.combatPower, 1),
             critChance = Mathf.Max(enemy.critChance, 2f),
@@ -1116,6 +1127,126 @@ public class ArenaWindowUI : MonoBehaviour
             return playerStats.combatPower;
 
         return Mathf.Max(fallbackPlayerPower, 1);
+    }
+
+    private int GetPlayerLevel()
+    {
+        if (playerStats != null)
+            return Mathf.Max(playerStats.level, 1);
+
+        return 1;
+    }
+
+    private void GenerateEnemies()
+    {
+        int playerPower = GetPlayerPower();
+        int playerLevel = GetPlayerLevel();
+
+        enemies = new[]
+        {
+            GenerateEnemy(ArenaEnemyDifficulty.Easy, playerPower, playerLevel),
+            GenerateEnemy(ArenaEnemyDifficulty.Balanced, playerPower, playerLevel),
+            GenerateEnemy(ArenaEnemyDifficulty.Hard, playerPower, playerLevel)
+        };
+    }
+
+    private ArenaEnemyData GenerateEnemy(ArenaEnemyDifficulty difficulty, int playerPower, int playerLevel)
+    {
+        float minPowerMultiplier;
+        float maxPowerMultiplier;
+        int minLevelOffset;
+        int maxLevelOffset;
+        float expScale;
+        float tokenScale;
+        string[] names;
+
+        switch (difficulty)
+        {
+            case ArenaEnemyDifficulty.Easy:
+                minPowerMultiplier = 0.70f;
+                maxPowerMultiplier = 0.85f;
+                minLevelOffset = -1;
+                maxLevelOffset = 0;
+                expScale = 0.72f;
+                tokenScale = 0.62f;
+                names = new[] { "Grave Cutthroat", "Ash Squire", "Pit Wanderer", "Bone Initiate" };
+                break;
+
+            case ArenaEnemyDifficulty.Hard:
+                minPowerMultiplier = 1.20f;
+                maxPowerMultiplier = 1.45f;
+                minLevelOffset = 1;
+                maxLevelOffset = 3;
+                expScale = 1.42f;
+                tokenScale = 1.55f;
+                names = new[] { "Blood Champion", "Blackguard Warden", "Dread Executioner", "Crownless Butcher" };
+                break;
+
+            default:
+                minPowerMultiplier = 0.95f;
+                maxPowerMultiplier = 1.10f;
+                minLevelOffset = 0;
+                maxLevelOffset = 1;
+                expScale = 1f;
+                tokenScale = 1f;
+                names = new[] { "Arena Duelist", "Iron Reaver", "Oathbound Knight", "Veil Hunter" };
+                break;
+        }
+
+        int level = Mathf.Max(playerLevel + Random.Range(minLevelOffset, maxLevelOffset + 1), 1);
+        int combatPower = Mathf.Max(Mathf.RoundToInt(playerPower * Random.Range(minPowerMultiplier, maxPowerMultiplier)), 100);
+        int hp = Mathf.Max(Mathf.RoundToInt(combatPower * Random.Range(0.32f, 0.46f)), 120);
+        int attack = Mathf.Max(Mathf.RoundToInt(combatPower * Random.Range(0.040f, 0.062f)), 15);
+        int defense = Mathf.Max(Mathf.RoundToInt(combatPower * Random.Range(0.014f, 0.025f)), 2);
+        int armor = Mathf.Max(Mathf.RoundToInt(defense * Random.Range(0.9f, 1.25f)), 0);
+        int agility = Mathf.Max(level + Mathf.RoundToInt(combatPower / Random.Range(300f, 380f)), 1);
+        int reaction = Mathf.Max(level + Mathf.RoundToInt(combatPower / Random.Range(260f, 340f)), 1);
+        float critChance = BuildEnemyCritChance(difficulty);
+        int baseExp = Mathf.Max(Mathf.RoundToInt((level * 4f + combatPower * 0.008f) * expScale), 8);
+        int tokens = Mathf.Max(Mathf.RoundToInt((level * 0.8f + combatPower * 0.002f) * tokenScale), 1);
+
+        return new ArenaEnemyData
+        {
+            enemyName = names[Random.Range(0, names.Length)],
+            level = level,
+            combatPower = combatPower,
+            hp = hp,
+            attack = attack,
+            defense = defense,
+            armor = armor,
+            agility = agility,
+            reaction = reaction,
+            critChance = critChance,
+            baseExpReward = baseExp,
+            tokenReward = tokens,
+            description = BuildEnemyDescription(difficulty)
+        };
+    }
+
+    private float BuildEnemyCritChance(ArenaEnemyDifficulty difficulty)
+    {
+        switch (difficulty)
+        {
+            case ArenaEnemyDifficulty.Easy:
+                return Random.Range(4f, 7.5f);
+            case ArenaEnemyDifficulty.Hard:
+                return Random.Range(8.5f, 14.5f);
+            default:
+                return Random.Range(6f, 10.5f);
+        }
+    }
+
+    private string BuildEnemyDescription(ArenaEnemyDifficulty difficulty)
+    {
+        switch (difficulty)
+        {
+            case ArenaEnemyDifficulty.Easy:
+                return "A lower-ranked challenger looking for a mistake to punish. Safer fight, lower reward.";
+            case ArenaEnemyDifficulty.Hard:
+                return "A dangerous Arena favorite with enough force to punish weak stance choices. High risk, high reward.";
+            default:
+                return "A close match for your current strength. A fair duel with solid Arena rewards.";
+        }
     }
 
     private bool TryGetEnemy(int enemyIndex, out ArenaEnemyData enemy)

@@ -36,7 +36,7 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks and Arena.
 
-## Current Project State After Combat Stance Selection UI v1
+## Current Project State After Arena Enemy Generation v1
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -46,7 +46,10 @@ The project currently compiles at the script level and the main gameplay loop is
 - equipment bonuses are reapplied through `EquipmentManager.RefreshPlayerStats()`
 - CharacterPanel progression UI refreshes from `PlayerStats`
 - Barracks inventory/equipment UI continues to use existing item instances and equipment state
-- ArenaWindow opens from the city hub and shows three selectable enemies
+- ArenaWindow opens from the city hub and shows three generated selectable enemies
+- Arena opponents are regenerated from current player combat power when ArenaWindow opens
+- Arena has a free `Refresh Opponents` button that regenerates the enemy list
+- EnemyInfoPanel shows the generated combat details for the selected opponent
 - selecting Fight runs Combat Simulation v1 through `CombatSimulator`
 - player can choose Arena combat stance in ArenaWindow before fighting
 - selected player stance is persisted in the local JSON save
@@ -66,7 +69,8 @@ Current known limitations:
 - Combat Simulation v1 has no animation layer yet
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
 - shield blocking is supported in code but no shield item type/data exists yet
-- enemy generation and Arena rank progression are still static/manual
+- Arena enemies are generated from current player combat power, but are not saved yet
+- Arena rank progression is intentionally not implemented yet
 
 ## Core Architecture
 
@@ -116,9 +120,11 @@ Current Arena features:
 
 - opens directly from the city hub Arena building
 - inactive by default in `MainMenu`
-- contains three enemy cards
+- contains three generated enemy cards
 - each enemy has a portrait placeholder, name, level, combat power, EXP reward, Arena Tokens reward, Info button, and Fight button
-- `EnemyInfoPanel` opens inside ArenaWindow for selected enemy details
+- enemy data includes HP, attack, defense, armor, agility, reaction, crit chance, base EXP, token reward, and description
+- `Refresh Opponents` regenerates the current easy/balanced/hard opponent set for free
+- `EnemyInfoPanel` opens inside ArenaWindow for selected enemy details and displays generated combat stats
 - compact player stance selector lives inside ArenaWindow
 - `ResultPanel` opens inside ArenaWindow after Combat Simulation v1
 - `BattleLogPanel` opens inside ArenaWindow from the ResultPanel Battle Log button
@@ -127,7 +133,8 @@ Current Arena features:
 Important ArenaWindow responsibilities:
 
 - build and refresh Arena UI panels
-- convert configured Arena enemy data into `CombatSimulator.FighterData`
+- generate Arena enemy data from current player combat power
+- convert generated Arena enemy data into `CombatSimulator.FighterData`
 - convert current `PlayerStats` into `CombatSimulator.FighterData`
 - call `CombatSimulator.Simulate(...)`
 - calculate and apply rewards based on combat outcome
@@ -371,7 +378,9 @@ Current completed or working systems:
 - direct Barracks opening from city hub
 - direct Arena opening from city hub
 - ArenaWindow v1
-- Arena enemy cards
+- generated Arena enemy cards
+- Arena enemy generation from player combat power
+- free Arena opponent refresh
 - Arena `EnemyInfoPanel`
 - Arena Combat Simulation v1
 - Arena combat stance selector UI
@@ -527,10 +536,51 @@ Arena enemies currently contain:
 - HP
 - attack
 - defense
+- armor
+- agility
+- reaction
 - crit chance
 - base EXP reward
 - Arena Tokens reward
 - short description
+
+Arena Enemy Generation v1:
+
+- enemies are generated in `ArenaWindowUI`
+- generation happens at runtime; generated enemies are not authored as static scene/prefab data
+- three enemies are generated at a time:
+  - Easy: roughly 70-85% of current player combat power
+  - Balanced: roughly 95-110% of current player combat power
+  - Hard: roughly 120-145% of current player combat power
+- generated enemy levels stay near player level:
+  - Easy: player level -1 to player level
+  - Balanced: player level to player level +1
+  - Hard: player level +1 to player level +3
+  - generated level never goes below 1
+- generated combat stats are derived from generated combat power:
+  - HP: about 32-46% of combat power
+  - Attack: about 4.0-6.2% of combat power
+  - Defense: about 1.4-2.5% of combat power
+  - Armor: about 90-125% of generated defense
+  - Agility and Reaction scale from enemy level plus combat power
+  - Crit chance scales by difficulty
+- generated enemies are not saved in Save System v1
+- enemies can regenerate when ArenaWindow opens or when the player presses `Refresh Opponents`
+- `Refresh Opponents` is free for now
+- refreshing opponents closes temporary Arena overlays such as EnemyInfoPanel, ResultPanel, and BattleLogPanel, then rebuilds the three enemy cards
+- EnemyInfoPanel now shows generated details:
+  - level
+  - combat power
+  - HP
+  - attack
+  - defense / armor
+  - agility
+  - reaction
+  - crit chance
+  - calculated EXP reward
+  - Arena Tokens reward
+  - generated difficulty description
+- rank progression is not involved in enemy generation yet
 
 Combat Simulation v1:
 
@@ -613,6 +663,14 @@ EXP reward multiplier:
 - enemy power <= player power * 1.3: x1.25
 - enemy power > player power * 1.3: x1.5
 
+Generated reward scaling:
+
+- generated base EXP scales from enemy level, enemy combat power, and difficulty
+- Easy enemies use lower EXP/token scaling
+- Balanced enemies use normal EXP/token scaling
+- Hard enemies use higher EXP/token scaling
+- the existing EXP reward multiplier still applies after base EXP generation
+
 ## Important Rules
 
 - Do not rename existing scenes, GameObjects, scripts, serialized fields, or inspector references unless absolutely necessary.
@@ -666,16 +724,17 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Add explicit New Game / Reset Progress debug UI
-2. Add save versioning / migration guard before save data grows further
-3. Add Arena enemy generation based on player combat power and rank
-4. Add Arena rank progression and token economy
-5. Add Arena combat balance pass after testing real outcomes
+1. Add Combat Playback v1 inside ArenaWindow
+2. Add explicit New Game / Reset Progress debug UI
+3. Add save versioning / migration guard before save data grows further
+4. Test and tune generated Arena enemy balance against real saved characters
+5. Add Arena rank progression and token economy later
+6. Add Arena combat balance pass after testing real outcomes
 
 Good follow-up systems:
 
 - Arena token shop
 - item rewards / loot drops saved through `PlayerInventory.AddItem`
 - combat balance pass for dodge, block, crit, and damage formulas
-- lightweight auto-battle visualization or combat replay layer
+- lightweight auto-battle visualization or combat replay layer after Combat Playback v1
 - shield item type / shield equipment slot if the design needs shield blocking
