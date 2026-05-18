@@ -169,6 +169,32 @@ It reads from `PlayerStats`.
 
 It reads `currentHp`, `maxHp`, `currentMp`, `maxMp`, `currentExp`, and `maxExp` from `PlayerStats`.
 
+### PlayerSaveManager
+
+`PlayerSaveManager` is Save System v1 for local player progression.
+
+Current persistence approach:
+
+- JSON file
+- stored in `Application.persistentDataPath`
+- file name: `arena_player_progression.json`
+
+Saved fields:
+
+- level
+- current EXP
+- required EXP (`maxExp`)
+- available stat points
+- Arena Tokens
+- allocated stat points
+
+The allocated stat fields are saved together with available stat points so spent points do not disappear after loading.
+
+Development reset:
+
+- `PlayerStats` has a context menu method: `Clear Saved Progression`
+- this deletes the local JSON save file
+
 ## Completed Systems
 
 Current completed or working systems:
@@ -206,6 +232,7 @@ Current completed or working systems:
 - level up from EXP
 - combat power growth from level/stat scaling
 - equipment refresh after Arena level-up
+- Save System v1 for player progression
 
 ## Arena Gameplay v1
 
@@ -297,14 +324,10 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Save System v1
-2. Persist `PlayerStats`
-3. Persist Arena Tokens
-4. Persist current EXP / level / required EXP
-5. Persist manual stat allocations
-6. Persist equipment state
-7. Persist inventory item instances
-8. Then improve Arena balance and enemy generation
+1. Persist equipment state
+2. Persist inventory item instances
+3. Add save slots or new-game reset UI
+4. Improve Arena balance and enemy generation
 
 After persistence is stable, good follow-up systems:
 

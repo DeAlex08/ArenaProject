@@ -16,7 +16,7 @@ public class PlayerStats : MonoBehaviour
 {
     [Header("Identity")]
     public string playerName = "ХГ";
-    public int level = 10;
+    public int level = 1;
 
     [Header("Resources")]
     public int currentHp = 250;
@@ -25,7 +25,7 @@ public class PlayerStats : MonoBehaviour
     public int currentMp = 80;
     public int maxMp = 1000;
 
-    public int currentExp = 35;
+    public int currentExp = 0;
     public int maxExp = 100;
 
     [Header("Currencies")]
@@ -103,8 +103,11 @@ public class PlayerStats : MonoBehaviour
 
     private void Start()
     {
+        LoadProgression();
+        EnsureValidProgressionValues();
         SyncAvailableStatPointsWithLevel();
         RecalculateStats();
+        RefreshEquipmentBonusesIfAvailable();
 
         currentHp = maxHp;
         currentMp = maxMp;
@@ -181,6 +184,7 @@ public class PlayerStats : MonoBehaviour
         availableStatPoints += statPointsPerLevel;
 
         RecalculateStats();
+        SaveProgression();
     }
 
     public int AddExperience(int amount)
@@ -209,6 +213,8 @@ public class PlayerStats : MonoBehaviour
             "/" +
             maxExp);
 
+        SaveProgression();
+
         return levelsGained;
     }
 
@@ -224,6 +230,8 @@ public class PlayerStats : MonoBehaviour
             amount +
             ". Total Arena Tokens: " +
             arenaTokens);
+
+        SaveProgression();
     }
 
     public void SyncAvailableStatPointsWithLevel()
@@ -293,8 +301,68 @@ public class PlayerStats : MonoBehaviour
 
         availableStatPoints--;
         RecalculateStats();
+        SaveProgression();
 
         return true;
+    }
+
+    public void SaveProgression()
+    {
+        PlayerSaveManager.Save(this);
+    }
+
+    [ContextMenu("Clear Saved Progression")]
+    public void ClearSavedProgression()
+    {
+        PlayerSaveManager.ClearSave();
+    }
+
+    private void LoadProgression()
+    {
+        if (!PlayerSaveManager.TryLoad(out PlayerSaveManager.PlayerProgressionSaveData saveData))
+            return;
+
+        level = saveData.level;
+        currentExp = saveData.currentExp;
+        maxExp = saveData.maxExp;
+        availableStatPoints = saveData.availableStatPoints;
+        arenaTokens = saveData.arenaTokens;
+        allocatedStrength = saveData.allocatedStrength;
+        allocatedRage = saveData.allocatedRage;
+        allocatedReaction = saveData.allocatedReaction;
+        allocatedAgility = saveData.allocatedAgility;
+        allocatedEndurance = saveData.allocatedEndurance;
+        allocatedArmor = saveData.allocatedArmor;
+        allocatedLuck = saveData.allocatedLuck;
+        allocatedIntelligence = saveData.allocatedIntelligence;
+
+        Debug.Log("PlayerStats: Loaded saved progression.");
+    }
+
+    private void EnsureValidProgressionValues()
+    {
+        level = Mathf.Max(level, 1);
+        currentExp = Mathf.Max(currentExp, 0);
+        maxExp = Mathf.Max(maxExp, 1);
+        availableStatPoints = Mathf.Max(availableStatPoints, 0);
+        arenaTokens = Mathf.Max(arenaTokens, 0);
+    }
+
+    private void RefreshEquipmentBonusesIfAvailable()
+    {
+        EquipmentManager[] managers = Resources.FindObjectsOfTypeAll<EquipmentManager>();
+
+        foreach (EquipmentManager manager in managers)
+        {
+            if (manager == null || !manager.gameObject.scene.IsValid())
+                continue;
+
+            if (manager.playerStats != this)
+                continue;
+
+            manager.RefreshPlayerStats();
+            return;
+        }
     }
 
     public void AllocateStrength()
