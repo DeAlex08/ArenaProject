@@ -10,9 +10,9 @@ public static class PlayerSaveManager
     [Serializable]
     public class PlayerProgressionSaveData
     {
-        public int level;
+        public int level = 1;
         public int currentExp;
-        public int maxExp;
+        public int maxExp = 100;
         public int availableStatPoints;
         public int arenaTokens;
         public int allocatedStrength;
@@ -23,6 +23,7 @@ public static class PlayerSaveManager
         public int allocatedArmor;
         public int allocatedLuck;
         public int allocatedIntelligence;
+        public string selectedArenaStance = "Standard";
         public List<SavedInventoryItem> inventoryItems = new List<SavedInventoryItem>();
         public SavedEquipment equipment = new SavedEquipment();
     }
@@ -114,6 +115,32 @@ public static class PlayerSaveManager
         WriteSaveData(saveData);
     }
 
+    public static CombatStance LoadArenaStance(CombatStance fallbackStance)
+    {
+        if (!TryLoad(out PlayerProgressionSaveData saveData))
+            return fallbackStance;
+
+        if (string.IsNullOrEmpty(saveData.selectedArenaStance))
+            return fallbackStance;
+
+        try
+        {
+            return (CombatStance)Enum.Parse(typeof(CombatStance), saveData.selectedArenaStance);
+        }
+        catch (Exception)
+        {
+            Debug.LogWarning("PlayerSaveManager: Unknown saved Arena stance: " + saveData.selectedArenaStance);
+            return fallbackStance;
+        }
+    }
+
+    public static void SaveArenaStance(CombatStance stance)
+    {
+        PlayerProgressionSaveData saveData = LoadOrCreateSaveData();
+        saveData.selectedArenaStance = stance.ToString();
+        WriteSaveData(saveData);
+    }
+
     private static List<SavedInventoryItem> BuildInventorySave(PlayerInventory inventory)
     {
         List<SavedInventoryItem> savedItems = new List<SavedInventoryItem>();
@@ -153,6 +180,9 @@ public static class PlayerSaveManager
 
         if (saveData.equipment == null)
             saveData.equipment = new SavedEquipment();
+
+        if (string.IsNullOrEmpty(saveData.selectedArenaStance))
+            saveData.selectedArenaStance = "Standard";
     }
 
     private static void WriteSaveData(PlayerProgressionSaveData saveData)

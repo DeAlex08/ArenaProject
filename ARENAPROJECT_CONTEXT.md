@@ -36,7 +36,7 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks and Arena.
 
-## Current Project State After Combat Simulation v1
+## Current Project State After Combat Stance Selection UI v1
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -48,7 +48,10 @@ The project currently compiles at the script level and the main gameplay loop is
 - Barracks inventory/equipment UI continues to use existing item instances and equipment state
 - ArenaWindow opens from the city hub and shows three selectable enemies
 - selecting Fight runs Combat Simulation v1 through `CombatSimulator`
+- player can choose Arena combat stance in ArenaWindow before fighting
+- selected player stance is persisted in the local JSON save
 - Arena ResultPanel shows Victory, Defeat, or Draw
+- Arena ResultPanel shows stance, remaining HP, damage dealt, crits, dodges, blocks, EXP, and Arena Tokens
 - Battle Log opens inside ArenaWindow and shows the full round-by-round combat log
 - Arena rewards still apply EXP and Arena Tokens through `PlayerStats`
 - Arena rewards still save through the existing progression/save system
@@ -61,7 +64,7 @@ Current known limitations:
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
 - Combat Simulation v1 has no animation layer yet
-- player combat stance is currently a serialized ArenaWindowUI setting, not a runtime player choice UI
+- player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
 - shield blocking is supported in code but no shield item type/data exists yet
 - enemy generation and Arena rank progression are still static/manual
 
@@ -116,6 +119,7 @@ Current Arena features:
 - contains three enemy cards
 - each enemy has a portrait placeholder, name, level, combat power, EXP reward, Arena Tokens reward, Info button, and Fight button
 - `EnemyInfoPanel` opens inside ArenaWindow for selected enemy details
+- compact player stance selector lives inside ArenaWindow
 - `ResultPanel` opens inside ArenaWindow after Combat Simulation v1
 - `BattleLogPanel` opens inside ArenaWindow from the ResultPanel Battle Log button
 - no real animated combat scene exists yet
@@ -127,6 +131,9 @@ Important ArenaWindow responsibilities:
 - convert current `PlayerStats` into `CombatSimulator.FighterData`
 - call `CombatSimulator.Simulate(...)`
 - calculate and apply rewards based on combat outcome
+- show and save player-selected combat stance
+- visually highlight the selected stance button
+- load saved stance on ArenaWindow initialization / enable
 - keep ResultPanel, EnemyInfoPanel, and BattleLogPanel inside ArenaWindow
 - keep Continue behavior scoped to closing only ResultPanel
 - keep Battle Log behavior scoped to opening/closing only BattleLogPanel
@@ -170,6 +177,13 @@ Important behavior:
 - shield block reduces most damage and is prepared for future shield items
 - CombatSimulator does not apply rewards or save data directly
 - `ArenaWindowUI` remains responsible for UI flow and reward application
+- `CombatResult` returns combat statistics for ResultPanel:
+  - damage dealt
+  - crits
+  - dodges
+  - blocks
+  - remaining HP
+  - player/enemy stances
 
 ### PlayerStats
 
@@ -268,8 +282,19 @@ Saved progression fields:
 - available stat points
 - Arena Tokens
 - allocated stat points
+- selected Arena combat stance
 
 The allocated stat fields are saved together with available stat points so spent points do not disappear after loading.
+
+Selected Arena stance persistence:
+
+- stored as string field `selectedArenaStance`
+- valid values currently match `CombatStance` enum names:
+  - `Aggressive`
+  - `Standard`
+  - `Defensive`
+- missing or unknown saved stance safely falls back to `Standard`
+- saving stance preserves existing progression, inventory, and equipment save data.
 
 Saved inventory fields:
 
@@ -297,6 +322,7 @@ Save triggers:
 - equipping an item through `EquipmentManager`
 - unequipping an item through `EquipmentManager`
 - inventory add/remove through `PlayerInventory`
+- selecting Arena combat stance through `ArenaWindowUI`
 
 Load flow:
 
@@ -309,6 +335,8 @@ Load flow:
 - if saved inventory data exists, `PlayerInventory` rebuilds owned item instances from `ItemDatabase`
 - `EquipmentManager.RestoreEquipmentFromSave()` restores equipped slots from saved item instance IDs
 - restored equipment is refreshed once through the existing equipment stat flow
+- `ArenaWindowUI` loads selected Arena combat stance from `PlayerSaveManager`
+- missing/old stance save data falls back safely to `Standard`
 
 Development reset:
 
@@ -346,9 +374,11 @@ Current completed or working systems:
 - Arena enemy cards
 - Arena `EnemyInfoPanel`
 - Arena Combat Simulation v1
+- Arena combat stance selector UI
 - Arena `ResultPanel`
 - Arena `BattleLogPanel`
 - round-by-round combat log
+- combat result stats: remaining HP, damage dealt, crits, dodges, blocks
 - Victory / Defeat / Draw Arena outcomes
 - Draw reward handling
 - EXP rewards from Arena
@@ -376,6 +406,7 @@ Implemented:
 - JSON save file in `Application.persistentDataPath`
 - progression load during `PlayerStats.Start()`
 - progression save after EXP gain, token gain, level-up, and stat allocation
+- selected Arena combat stance persistence
 - inventory item instance persistence
 - equipped item slot persistence
 - stable item IDs through `ItemData.itemId`
@@ -525,6 +556,34 @@ Combat stances:
 - Standard: attacks once and blocks 2 random body zones
 - Defensive: 75% chance to full block 4 random zones, 25% chance to attack once
 
+Player stance selection UI:
+
+- lives inside `ArenaWindow`
+- defaults to `Standard`
+- uses three compact segmented buttons:
+  - Aggressive
+  - Standard
+  - Defensive
+- selected stance is visually highlighted
+- selected stance is saved through `PlayerSaveManager.selectedArenaStance`
+- selected stance is restored when ArenaWindow loads
+- old save files without stance data fall back to `Standard`
+- selecting a stance does not start combat by itself
+- Fight buttons use whichever stance is currently selected
+
+ResultPanel combat summary:
+
+- no longer emphasizes old final power values
+- shows player stance and enemy stance
+- shows remaining HP for both fighters
+- shows total damage dealt by both fighters
+- shows compact `C/D/B` stats:
+  - crits
+  - dodges
+  - blocks
+- still shows EXP gained and Arena Tokens gained
+- Continue still closes only ResultPanel and returns to the Arena enemy list
+
 Reward rules:
 
 - victory: full calculated EXP and full Arena Tokens
@@ -535,6 +594,13 @@ Combat log behavior:
 
 - each fight generates a readable round-by-round log
 - the log includes stances, attack/block plans, target zones, dodges, blocks, crits, counters, damage, round-end HP, and final result
+- rounds are visually separated in text
+- log entries use lightweight tags:
+  - `[STANCE]`
+  - `[DODGE]`
+  - `[BLOCK]`
+  - `[CRIT]`
+  - `[COUNTER]`
 - ResultPanel has a `Battle Log` button
 - BattleLogPanel is opened inside ArenaWindow
 - BattleLogPanel closes independently and does not close ResultPanel or ArenaWindow
@@ -602,9 +668,9 @@ Recommended next development direction:
 
 1. Add explicit New Game / Reset Progress debug UI
 2. Add save versioning / migration guard before save data grows further
-3. Add Arena stance selection UI for the player
-4. Add Arena enemy generation based on player combat power and rank
-5. Add Arena rank progression and token economy
+3. Add Arena enemy generation based on player combat power and rank
+4. Add Arena rank progression and token economy
+5. Add Arena combat balance pass after testing real outcomes
 
 Good follow-up systems:
 

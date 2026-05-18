@@ -343,7 +343,7 @@ public class PlayerStats : MonoBehaviour
     {
         level = Mathf.Max(level, 1);
         currentExp = Mathf.Max(currentExp, 0);
-        maxExp = Mathf.Max(maxExp, 1);
+        maxExp = maxExp > 0 ? maxExp : 100;
         availableStatPoints = Mathf.Max(availableStatPoints, 0);
         arenaTokens = Mathf.Max(arenaTokens, 0);
     }

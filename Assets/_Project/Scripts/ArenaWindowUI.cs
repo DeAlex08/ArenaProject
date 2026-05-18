@@ -16,6 +16,16 @@ public class ArenaWindowUI : MonoBehaviour
         public int expGained;
         public int tokensGained;
         public int rounds;
+        public int playerDamageDealt;
+        public int enemyDamageDealt;
+        public int playerCrits;
+        public int enemyCrits;
+        public int playerDodges;
+        public int enemyDodges;
+        public int playerBlocks;
+        public int enemyBlocks;
+        public CombatStance playerStance;
+        public CombatStance enemyStance;
         public string combatLog;
     }
 
@@ -107,14 +117,20 @@ public class ArenaWindowUI : MonoBehaviour
     private GameObject resultPanel;
     private TMP_Text resultTitleText;
     private TMP_Text resultEnemyText;
-    private TMP_Text resultPlayerPowerText;
-    private TMP_Text resultEnemyPowerText;
+    private TMP_Text resultPlayerStanceText;
+    private TMP_Text resultEnemyStanceText;
+    private TMP_Text resultHpText;
+    private TMP_Text resultDamageText;
+    private TMP_Text resultCombatStatsText;
     private TMP_Text resultExpText;
     private TMP_Text resultTokensText;
     private TMP_Text resultMessageText;
     private GameObject battleLogPanel;
     private TMP_Text battleLogText;
     private TMP_Text arenaTokensText;
+    private Button aggressiveStanceButton;
+    private Button standardStanceButton;
+    private Button defensiveStanceButton;
     private int selectedEnemyIndex = -1;
     private string lastBattleLog = "";
 
@@ -132,12 +148,15 @@ public class ArenaWindowUI : MonoBehaviour
 
     private void Awake()
     {
+        LoadSavedPlayerStance();
         BuildIfNeeded();
     }
 
     private void OnEnable()
     {
+        LoadSavedPlayerStance();
         BuildIfNeeded();
+        RefreshStanceButtons();
         RefreshArenaTokensText();
         HideEnemyInfo();
         HideResult();
@@ -172,8 +191,8 @@ public class ArenaWindowUI : MonoBehaviour
             enemy.enemyName +
             " | Level: " + enemy.level +
             " | Power: " + enemy.combatPower +
-            " | Player Final Power: " + result.finalPlayerPower +
-            " | Enemy Final Power: " + result.finalEnemyPower +
+            " | Player Stance: " + result.playerStance +
+            " | Enemy Stance: " + result.enemyStance +
             " | EXP Gained: " + result.expGained +
             " | Arena Tokens Gained: " + result.tokensGained);
     }
@@ -201,7 +220,7 @@ public class ArenaWindowUI : MonoBehaviour
 
         VerticalLayoutGroup rootLayout = gameObject.AddComponent<VerticalLayoutGroup>();
         rootLayout.padding = new RectOffset(72, 72, 36, 56);
-        rootLayout.spacing = 22f;
+        rootLayout.spacing = 16f;
         rootLayout.childAlignment = TextAnchor.UpperCenter;
         rootLayout.childControlWidth = true;
         rootLayout.childControlHeight = true;
@@ -210,6 +229,7 @@ public class ArenaWindowUI : MonoBehaviour
 
         BuildHeader();
         BuildSummary();
+        BuildStanceSelector();
         BuildEnemies();
         BuildEnemyInfoPanel();
         BuildResultPanel();
@@ -259,6 +279,46 @@ public class ArenaWindowUI : MonoBehaviour
         arenaTokensText = CreateStatusLabel("ArenaTokensText", summary.transform, BuildArenaTokensText());
     }
 
+    private void BuildStanceSelector()
+    {
+        GameObject selector = CreateLayoutObject("StanceSelector", transform);
+        Image selectorImage = selector.AddComponent<Image>();
+        selectorImage.color = new Color(0.045f, 0.034f, 0.024f, 0.92f);
+        AddOutline(selector, darkBorderColor, new Vector2(2f, -2f));
+
+        HorizontalLayoutGroup layout = selector.AddComponent<HorizontalLayoutGroup>();
+        layout.padding = new RectOffset(18, 18, 8, 8);
+        layout.spacing = 12f;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+
+        LayoutElement selectorElement = selector.AddComponent<LayoutElement>();
+        selectorElement.minHeight = 64f;
+        selectorElement.preferredHeight = 64f;
+
+        TMP_Text label = CreateText("Label", selector.transform, "Stance", 23, FontStyles.Bold, TextAlignmentOptions.Center);
+        label.color = mutedTextColor;
+        LayoutElement labelElement = label.gameObject.GetComponent<LayoutElement>();
+        labelElement.minWidth = 120f;
+        labelElement.preferredWidth = 130f;
+
+        aggressiveStanceButton = CreateStanceButton(selector.transform, "Aggressive", CombatStance.Aggressive);
+        standardStanceButton = CreateStanceButton(selector.transform, "Standard", CombatStance.Standard);
+        defensiveStanceButton = CreateStanceButton(selector.transform, "Defensive", CombatStance.Defensive);
+
+        RefreshStanceButtons();
+    }
+
+    private Button CreateStanceButton(Transform parent, string label, CombatStance stance)
+    {
+        Button button = CreateButton("Stance" + stance + "Button", parent, label, 22, new Vector2(220f, 48f), closeButtonColor);
+        button.onClick.AddListener(() => SetPlayerStance(stance, true));
+        return button;
+    }
+
     private void BuildEnemies()
     {
         GameObject list = CreateLayoutObject("EnemyCards", transform);
@@ -271,8 +331,8 @@ public class ArenaWindowUI : MonoBehaviour
         listLayout.childForceExpandHeight = true;
 
         LayoutElement listElement = list.AddComponent<LayoutElement>();
-        listElement.minHeight = 690f;
-        listElement.preferredHeight = 690f;
+        listElement.minHeight = 610f;
+        listElement.preferredHeight = 610f;
         listElement.flexibleHeight = 1f;
 
         int enemyCount = enemies != null ? enemies.Length : 0;
@@ -302,10 +362,10 @@ public class ArenaWindowUI : MonoBehaviour
         cardElement.minWidth = 360f;
         cardElement.preferredWidth = 400f;
         cardElement.flexibleWidth = 1f;
-        cardElement.minHeight = 620f;
-        cardElement.preferredHeight = 650f;
+        cardElement.minHeight = 560f;
+        cardElement.preferredHeight = 590f;
 
-        CreatePortraitPlaceholder(card.transform, enemyIndex, 190f, 204f);
+        CreatePortraitPlaceholder(card.transform, enemyIndex, 150f, 160f);
 
         TMP_Text enemyNameText = CreateText("EnemyNameText", card.transform, enemy.enemyName, 31, FontStyles.Bold, TextAlignmentOptions.Center);
         enemyNameText.color = titleColor;
@@ -464,12 +524,12 @@ public class ArenaWindowUI : MonoBehaviour
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.anchoredPosition = Vector2.zero;
-        rect.sizeDelta = new Vector2(780f, 720f);
+        rect.sizeDelta = new Vector2(840f, 820f);
         rect.pivot = new Vector2(0.5f, 0.5f);
 
         VerticalLayoutGroup layout = resultPanel.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(48, 48, 42, 46);
-        layout.spacing = 18f;
+        layout.spacing = 12f;
         layout.childAlignment = TextAnchor.UpperCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -481,14 +541,17 @@ public class ArenaWindowUI : MonoBehaviour
         resultTitleText.gameObject.GetComponent<LayoutElement>().preferredHeight = 72f;
 
         resultEnemyText = CreateResultLine("EnemyText");
-        resultPlayerPowerText = CreateResultLine("PlayerPowerText");
-        resultEnemyPowerText = CreateResultLine("EnemyPowerText");
+        resultPlayerStanceText = CreateResultLine("PlayerStanceText");
+        resultEnemyStanceText = CreateResultLine("EnemyStanceText");
+        resultHpText = CreateResultLine("RemainingHpText");
+        resultDamageText = CreateResultLine("DamageText");
+        resultCombatStatsText = CreateResultLine("CombatStatsText");
         resultExpText = CreateResultLine("ExpText");
         resultTokensText = CreateResultLine("TokensText");
 
         resultMessageText = CreateText("MessageText", resultPanel.transform, "", 25, FontStyles.Normal, TextAlignmentOptions.Center);
         resultMessageText.color = mutedTextColor;
-        resultMessageText.gameObject.GetComponent<LayoutElement>().preferredHeight = 100f;
+        resultMessageText.gameObject.GetComponent<LayoutElement>().preferredHeight = 86f;
 
         GameObject spacer = CreateLayoutObject("Spacer", resultPanel.transform);
         spacer.AddComponent<LayoutElement>().flexibleHeight = 1f;
@@ -608,9 +671,9 @@ public class ArenaWindowUI : MonoBehaviour
 
     private TMP_Text CreateResultLine(string objectName)
     {
-        TMP_Text text = CreateText(objectName, resultPanel.transform, "", 27, FontStyles.Bold, TextAlignmentOptions.Center);
+        TMP_Text text = CreateText(objectName, resultPanel.transform, "", 23, FontStyles.Bold, TextAlignmentOptions.Center);
         text.color = textColor;
-        text.gameObject.GetComponent<LayoutElement>().preferredHeight = 44f;
+        text.gameObject.GetComponent<LayoutElement>().preferredHeight = 36f;
         return text;
     }
 
@@ -656,9 +719,9 @@ public class ArenaWindowUI : MonoBehaviour
 
     private ArenaFightResult RunPseudoBattle(ArenaEnemyData enemy)
     {
-        CombatSimulator.CombatResult combatResult = CombatSimulator.Simulate(
-            BuildPlayerCombatant(),
-            BuildEnemyCombatant(enemy));
+        CombatSimulator.FighterData playerCombatant = BuildPlayerCombatant();
+        CombatSimulator.FighterData enemyCombatant = BuildEnemyCombatant(enemy);
+        CombatSimulator.CombatResult combatResult = CombatSimulator.Simulate(playerCombatant, enemyCombatant);
 
         int calculatedExpReward = CalculateExpReward(enemy);
         int expGained = 0;
@@ -694,6 +757,16 @@ public class ArenaWindowUI : MonoBehaviour
             expGained = expGained,
             tokensGained = tokensGained,
             rounds = combatResult.rounds,
+            playerDamageDealt = combatResult.playerDamageDealt,
+            enemyDamageDealt = combatResult.enemyDamageDealt,
+            playerCrits = combatResult.playerCrits,
+            enemyCrits = combatResult.enemyCrits,
+            playerDodges = combatResult.playerDodges,
+            enemyDodges = combatResult.enemyDodges,
+            playerBlocks = combatResult.playerBlocks,
+            enemyBlocks = combatResult.enemyBlocks,
+            playerStance = combatResult.playerStance,
+            enemyStance = combatResult.enemyStance,
             combatLog = combatResult.combatLog
         };
 
@@ -706,8 +779,23 @@ public class ArenaWindowUI : MonoBehaviour
         resultTitleText.text = GetResultTitle(result.outcome);
         resultTitleText.color = GetResultColor(result.outcome);
         resultEnemyText.text = "Enemy: " + enemy.enemyName;
-        resultPlayerPowerText.text = "Player Final Power: " + result.finalPlayerPower;
-        resultEnemyPowerText.text = "Enemy Final Power: " + result.finalEnemyPower;
+        resultPlayerStanceText.text = "Player Stance: " + result.playerStance;
+        resultEnemyStanceText.text = "Enemy Stance: " + result.enemyStance;
+        resultHpText.text = "Remaining HP: " + result.playerRemainingHp + "/" + result.playerStartHp + " vs " + result.enemyRemainingHp + "/" + result.enemyStartHp;
+        resultDamageText.text = "Damage Dealt: " + result.playerDamageDealt + " vs " + result.enemyDamageDealt;
+        resultCombatStatsText.text =
+            "C/D/B: " +
+            result.playerCrits +
+            "/" +
+            result.playerDodges +
+            "/" +
+            result.playerBlocks +
+            " vs " +
+            result.enemyCrits +
+            "/" +
+            result.enemyDodges +
+            "/" +
+            result.enemyBlocks;
         resultExpText.text = "EXP Gained: " + result.expGained;
         resultTokensText.text = "Arena Tokens Gained: " + result.tokensGained;
         resultMessageText.text = BuildResultMessage(result, enemy);
@@ -778,6 +866,46 @@ public class ArenaWindowUI : MonoBehaviour
         CharacterPanelStatsViewUI characterStatsView = FindFirstObjectByType<CharacterPanelStatsViewUI>();
         if (characterStatsView != null)
             characterStatsView.Refresh();
+    }
+
+    private void LoadSavedPlayerStance()
+    {
+        playerStance = PlayerSaveManager.LoadArenaStance(CombatStance.Standard);
+    }
+
+    private void SetPlayerStance(CombatStance stance, bool save)
+    {
+        playerStance = stance;
+        RefreshStanceButtons();
+
+        if (save)
+            PlayerSaveManager.SaveArenaStance(playerStance);
+    }
+
+    private void RefreshStanceButtons()
+    {
+        RefreshStanceButton(aggressiveStanceButton, CombatStance.Aggressive);
+        RefreshStanceButton(standardStanceButton, CombatStance.Standard);
+        RefreshStanceButton(defensiveStanceButton, CombatStance.Defensive);
+    }
+
+    private void RefreshStanceButton(Button button, CombatStance stance)
+    {
+        if (button == null)
+            return;
+
+        bool isSelected = playerStance == stance;
+        Color backgroundColor = isSelected ? buttonColor : closeButtonColor;
+        Image image = button.GetComponent<Image>();
+
+        if (image != null)
+            image.color = backgroundColor;
+
+        TMP_Text text = button.GetComponentInChildren<TMP_Text>();
+        if (text != null)
+            text.color = isSelected ? titleColor : mutedTextColor;
+
+        ConfigureButtonColors(button, backgroundColor);
     }
 
     private void RefreshArenaTokensText()
@@ -871,14 +999,6 @@ public class ArenaWindowUI : MonoBehaviour
         string hpLine =
             "Rounds: " +
             result.rounds +
-            " | HP: " +
-            result.playerRemainingHp +
-            "/" +
-            result.playerStartHp +
-            " vs " +
-            result.enemyRemainingHp +
-            "/" +
-            result.enemyStartHp +
             ". ";
 
         switch (result.outcome)

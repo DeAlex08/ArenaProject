@@ -65,6 +65,16 @@ public static class CombatSimulator
         public int enemyRemainingHp;
         public int playerFinalPower;
         public int enemyFinalPower;
+        public int playerDamageDealt;
+        public int enemyDamageDealt;
+        public int playerCrits;
+        public int enemyCrits;
+        public int playerDodges;
+        public int enemyDodges;
+        public int playerBlocks;
+        public int enemyBlocks;
+        public CombatStance playerStance;
+        public CombatStance enemyStance;
         public string combatLog;
     }
 
@@ -72,6 +82,11 @@ public static class CombatSimulator
     {
         public FighterData data;
         public int currentHp;
+        public bool isPlayer;
+        public int damageDealt;
+        public int crits;
+        public int dodges;
+        public int blocks;
 
         public float HpPercent => data.maxHp > 0 ? (float)currentHp / data.maxHp : 0f;
         public bool IsDead => currentHp <= 0;
@@ -95,13 +110,13 @@ public static class CombatSimulator
 
     public static CombatResult Simulate(FighterData playerData, FighterData enemyData)
     {
-        FighterState player = CreateState(playerData, "Player");
-        FighterState enemy = CreateState(enemyData, "Enemy");
+        FighterState player = CreateState(playerData, "Player", true);
+        FighterState enemy = CreateState(enemyData, "Enemy", false);
 
         StringBuilder log = new StringBuilder();
         log.AppendLine("Arena battle begins.");
-        log.AppendLine(player.data.fighterName + " stance: " + player.data.stance);
-        log.AppendLine(enemy.data.fighterName + " stance: " + enemy.data.stance);
+        log.AppendLine("[STANCE] " + player.data.fighterName + ": " + player.data.stance);
+        log.AppendLine("[STANCE] " + enemy.data.fighterName + ": " + enemy.data.stance);
         log.AppendLine("");
 
         int roundsCompleted = 0;
@@ -113,9 +128,10 @@ public static class CombatSimulator
             RoundPlan playerPlan = BuildRoundPlan(player.data);
             RoundPlan enemyPlan = BuildRoundPlan(enemy.data);
 
-            log.AppendLine("Round " + round);
+            log.AppendLine("---- Round " + round + " ----");
             LogPlan(log, player.data.fighterName, playerPlan);
             LogPlan(log, enemy.data.fighterName, enemyPlan);
+            log.AppendLine("");
 
             ResolvePrimaryAttacks(player, enemy, playerPlan, enemyPlan, log);
             ResolvePrimaryAttacks(enemy, player, enemyPlan, playerPlan, log);
@@ -153,11 +169,21 @@ public static class CombatSimulator
             enemyRemainingHp = Mathf.Max(enemy.currentHp, 0),
             playerFinalPower = CalculateFinalPower(player),
             enemyFinalPower = CalculateFinalPower(enemy),
+            playerDamageDealt = player.damageDealt,
+            enemyDamageDealt = enemy.damageDealt,
+            playerCrits = player.crits,
+            enemyCrits = enemy.crits,
+            playerDodges = player.dodges,
+            enemyDodges = enemy.dodges,
+            playerBlocks = player.blocks,
+            enemyBlocks = enemy.blocks,
+            playerStance = player.data.stance,
+            enemyStance = enemy.data.stance,
             combatLog = log.ToString()
         };
     }
 
-    private static FighterState CreateState(FighterData data, string fallbackName)
+    private static FighterState CreateState(FighterData data, string fallbackName, bool isPlayer)
     {
         FighterData safeData = data ?? new FighterData();
         safeData.fighterName = string.IsNullOrEmpty(safeData.fighterName) ? fallbackName : safeData.fighterName;
@@ -169,7 +195,8 @@ public static class CombatSimulator
         return new FighterState
         {
             data = safeData,
-            currentHp = safeData.maxHp
+            currentHp = safeData.maxHp,
+            isPlayer = isPlayer
         };
     }
 
@@ -258,7 +285,9 @@ public static class CombatSimulator
 
         if (RollDodge(defender.data))
         {
-            log.AppendLine(attacker.data.fighterName + " " + attackLabel + " " + FormatZone(targetZone) + ", but " + defender.data.fighterName + " dodges.");
+            defender.dodges++;
+
+            log.AppendLine("[DODGE] " + attacker.data.fighterName + " " + attackLabel + " " + FormatZone(targetZone) + ", but " + defender.data.fighterName + " dodges.");
 
             if (!isCounter)
                 TryCounter(defender, attacker, log);
@@ -267,20 +296,28 @@ public static class CombatSimulator
         }
 
         bool isBlocked = IsZoneBlocked(defenderPlan, targetZone);
+        if (isBlocked)
+            defender.blocks++;
+
         int damage = CalculateDamage(attacker.data, defender.data, defenderPlan.blockType, targetZone, isBlocked);
         bool isCrit = RollCrit(attacker.data);
 
         if (isCrit)
+        {
             damage = Mathf.Max(Mathf.RoundToInt(damage * 1.5f), damage + 1);
+            attacker.crits++;
+        }
 
         defender.currentHp -= damage;
+        attacker.damageDealt += damage;
 
         string blockText = isBlocked
-            ? " Blocked with " + defenderPlan.blockType + "."
+            ? " [BLOCK] Blocked with " + defenderPlan.blockType + "."
             : "";
-        string critText = isCrit ? " Critical hit." : "";
+        string critText = isCrit ? " [CRIT] Critical hit." : "";
 
         log.AppendLine(
+            (isCounter ? "[COUNTER] " : "") +
             attacker.data.fighterName +
             " " +
             attackLabel +
@@ -322,7 +359,7 @@ public static class CombatSimulator
         if (Random.Range(0f, 100f) >= chance)
             return;
 
-        log.AppendLine(counterAttacker.data.fighterName + " finds an opening for a counterattack.");
+        log.AppendLine("[COUNTER] " + counterAttacker.data.fighterName + " finds an opening for a counterattack.");
         ResolveAttack(counterAttacker, originalAttacker, new RoundPlan(), true, log);
     }
 
