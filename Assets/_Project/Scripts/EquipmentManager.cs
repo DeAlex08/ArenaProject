@@ -351,6 +351,8 @@ public void UnequipWeapon2()
 
         if (statsDisplayUI != null)
             statsDisplayUI.Refresh();
+
+        FindFirstObjectByType<CharacterPanelStatsViewUI>()?.Refresh();
     
             FindFirstObjectByType<BarracksInventoryUI>()?.RefreshCurrentCategory();
     }
