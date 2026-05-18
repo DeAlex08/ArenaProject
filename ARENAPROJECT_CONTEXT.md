@@ -190,6 +190,28 @@ Saved fields:
 
 The allocated stat fields are saved together with available stat points so spent points do not disappear after loading.
 
+New player defaults:
+
+- level starts at 1
+- current EXP starts at 0
+- Arena Tokens start at 0
+- starting required EXP (`maxExp`) is 100
+
+Save triggers:
+
+- gaining EXP through `PlayerStats.AddExperience(int amount)`
+- gaining Arena Tokens through `PlayerStats.AddArenaTokens(int amount)`
+- level-up through `PlayerStats.LevelUp()`
+- manual stat allocation through `PlayerStats.TryAllocateStat(PlayerStatType statType)`
+
+Load flow:
+
+- `PlayerStats.Start()` attempts to load progression from JSON
+- loaded values are validated for safe minimums
+- stats are recalculated
+- `PlayerStats` then searches inactive scene objects for a matching `EquipmentManager`
+- if a matching manager is found, `EquipmentManager.RefreshPlayerStats()` reapplies equipment bonuses through the existing equipment flow
+
 Development reset:
 
 - `PlayerStats` has a context menu method: `Clear Saved Progression`
@@ -233,6 +255,40 @@ Current completed or working systems:
 - combat power growth from level/stat scaling
 - equipment refresh after Arena level-up
 - Save System v1 for player progression
+- new player progression defaults: level 1, EXP 0, Arena Tokens 0
+- persistent level/current EXP/required EXP
+- persistent Arena Tokens
+- persistent available and allocated stat points
+- context menu reset for local progression save
+
+## Progression And Save System v1
+
+Save System v1 is intentionally small and local-only.
+
+Implemented:
+
+- `PlayerSaveManager`
+- JSON save file in `Application.persistentDataPath`
+- progression load during `PlayerStats.Start()`
+- progression save after EXP gain, token gain, level-up, and stat allocation
+- development reset through `PlayerStats` context menu
+
+Not implemented yet:
+
+- equipment persistence
+- inventory item instance persistence
+- save slots
+- cloud save
+- explicit new-game UI
+- encryption or anti-cheat protection
+
+Current limitation:
+
+The save system persists progression only. If the app restarts, equipment and inventory still depend on current scene/inspector/runtime state until equipment and inventory persistence are implemented.
+
+Important safety note:
+
+After loading progression, equipment bonuses must still be applied through `EquipmentManager.RefreshPlayerStats()`. Do not apply equipment item bonuses directly from save code.
 
 ## Arena Gameplay v1
 
@@ -324,15 +380,14 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Persist equipment state
-2. Persist inventory item instances
-3. Add save slots or new-game reset UI
-4. Improve Arena balance and enemy generation
+1. Save System v2: persist inventory item instances
+2. Save System v2: persist equipped item instance IDs / equipment slot state
+3. Add explicit New Game / Reset Progress debug UI
+4. Add Arena enemy generation based on player combat power and rank
+5. Add Arena rank progression and token economy
 
 After persistence is stable, good follow-up systems:
 
-- Arena enemy generation by player power
-- Arena rank progression
 - Arena token shop
 - first real combat prototype
 - combat log or lightweight auto-battle visualization
