@@ -4,6 +4,15 @@ using UnityEngine.UI;
 
 public class ArenaWindowUI : MonoBehaviour
 {
+    private struct ArenaFightResult
+    {
+        public bool isVictory;
+        public int finalPlayerPower;
+        public int finalEnemyPower;
+        public int expGained;
+        public int tokensGained;
+    }
+
     [System.Serializable]
     private class ArenaEnemyData
     {
@@ -88,6 +97,14 @@ public class ArenaWindowUI : MonoBehaviour
     private TMP_Text infoTokenText;
     private TMP_Text infoDescriptionText;
     private Button infoFightButton;
+    private GameObject resultPanel;
+    private TMP_Text resultTitleText;
+    private TMP_Text resultEnemyText;
+    private TMP_Text resultPlayerPowerText;
+    private TMP_Text resultEnemyPowerText;
+    private TMP_Text resultExpText;
+    private TMP_Text resultTokensText;
+    private TMP_Text resultMessageText;
     private int selectedEnemyIndex = -1;
 
     private readonly Color panelColor = new Color(0.015f, 0.013f, 0.012f, 0.985f);
@@ -111,6 +128,7 @@ public class ArenaWindowUI : MonoBehaviour
     {
         BuildIfNeeded();
         HideEnemyInfo();
+        HideResult();
     }
 
     public void Close()
@@ -129,15 +147,21 @@ public class ArenaWindowUI : MonoBehaviour
         if (!TryGetEnemy(enemyIndex, out ArenaEnemyData enemy))
             return;
 
-        int expReward = CalculateExpReward(enemy);
+        ArenaFightResult result = RunPseudoBattle(enemy);
+        HideEnemyInfo();
+        ShowResult(enemy, result);
 
         Debug.Log(
-            "ArenaWindowUI: Selected arena enemy: " +
+            "ArenaWindowUI: Fight result: " +
+            (result.isVictory ? "Victory" : "Defeat") +
+            " | Enemy: " +
             enemy.enemyName +
             " | Level: " + enemy.level +
             " | Power: " + enemy.combatPower +
-            " | EXP Reward: " + expReward +
-            " | Arena Tokens: " + enemy.tokenReward);
+            " | Player Final Power: " + result.finalPlayerPower +
+            " | Enemy Final Power: " + result.finalEnemyPower +
+            " | EXP Gained: " + result.expGained +
+            " | Arena Tokens Gained: " + result.tokensGained);
     }
 
     private void BuildIfNeeded()
@@ -174,6 +198,7 @@ public class ArenaWindowUI : MonoBehaviour
         BuildSummary();
         BuildEnemies();
         BuildEnemyInfoPanel();
+        BuildResultPanel();
     }
 
     private void BuildHeader()
@@ -410,6 +435,64 @@ public class ArenaWindowUI : MonoBehaviour
         HideEnemyInfo();
     }
 
+    private void BuildResultPanel()
+    {
+        resultPanel = CreateLayoutObject("ResultPanel", transform);
+        LayoutElement ignoreLayout = resultPanel.AddComponent<LayoutElement>();
+        ignoreLayout.ignoreLayout = true;
+
+        Image panelImage = resultPanel.AddComponent<Image>();
+        panelImage.color = new Color(0.025f, 0.02f, 0.016f, 0.99f);
+        AddOutline(resultPanel, borderColor, new Vector2(2f, -2f));
+
+        RectTransform rect = resultPanel.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(780f, 720f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+
+        VerticalLayoutGroup layout = resultPanel.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(48, 48, 42, 46);
+        layout.spacing = 18f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        resultTitleText = CreateText("ResultTitleText", resultPanel.transform, "", 44, FontStyles.Bold, TextAlignmentOptions.Center);
+        resultTitleText.characterSpacing = 6f;
+        resultTitleText.gameObject.GetComponent<LayoutElement>().preferredHeight = 72f;
+
+        resultEnemyText = CreateResultLine("EnemyText");
+        resultPlayerPowerText = CreateResultLine("PlayerPowerText");
+        resultEnemyPowerText = CreateResultLine("EnemyPowerText");
+        resultExpText = CreateResultLine("ExpText");
+        resultTokensText = CreateResultLine("TokensText");
+
+        resultMessageText = CreateText("MessageText", resultPanel.transform, "", 25, FontStyles.Normal, TextAlignmentOptions.Center);
+        resultMessageText.color = mutedTextColor;
+        resultMessageText.gameObject.GetComponent<LayoutElement>().preferredHeight = 100f;
+
+        GameObject spacer = CreateLayoutObject("Spacer", resultPanel.transform);
+        spacer.AddComponent<LayoutElement>().flexibleHeight = 1f;
+
+        Button continueButton = CreateButton("ContinueButton", resultPanel.transform, "Continue", 30, new Vector2(0f, 78f), buttonColor);
+        continueButton.gameObject.GetComponent<LayoutElement>().flexibleWidth = 1f;
+        continueButton.onClick.AddListener(HideResult);
+
+        HideResult();
+    }
+
+    private TMP_Text CreateResultLine(string objectName)
+    {
+        TMP_Text text = CreateText(objectName, resultPanel.transform, "", 27, FontStyles.Bold, TextAlignmentOptions.Center);
+        text.color = textColor;
+        text.gameObject.GetComponent<LayoutElement>().preferredHeight = 44f;
+        return text;
+    }
+
     private TMP_Text CreateInfoLine(string objectName, Transform parent)
     {
         TMP_Text text = CreateText(objectName, parent, "", 25, FontStyles.Bold, TextAlignmentOptions.Left);
@@ -448,6 +531,48 @@ public class ArenaWindowUI : MonoBehaviour
     {
         if (enemyInfoPanel != null)
             enemyInfoPanel.SetActive(false);
+    }
+
+    private ArenaFightResult RunPseudoBattle(ArenaEnemyData enemy)
+    {
+        int playerPower = GetPlayerPower();
+        int finalPlayerPower = Mathf.RoundToInt(playerPower * Random.Range(0.9f, 1.1f));
+        int finalEnemyPower = Mathf.RoundToInt(enemy.combatPower * Random.Range(0.9f, 1.1f));
+        bool isVictory = finalPlayerPower >= finalEnemyPower;
+        int calculatedExpReward = CalculateExpReward(enemy);
+
+        ArenaFightResult result = new ArenaFightResult
+        {
+            isVictory = isVictory,
+            finalPlayerPower = finalPlayerPower,
+            finalEnemyPower = finalEnemyPower,
+            expGained = isVictory ? calculatedExpReward : Mathf.RoundToInt(calculatedExpReward * 0.25f),
+            tokensGained = isVictory ? enemy.tokenReward : 0
+        };
+
+        return result;
+    }
+
+    private void ShowResult(ArenaEnemyData enemy, ArenaFightResult result)
+    {
+        resultTitleText.text = result.isVictory ? "VICTORY" : "DEFEAT";
+        resultTitleText.color = result.isVictory ? titleColor : new Color(0.74f, 0.18f, 0.13f, 1f);
+        resultEnemyText.text = "Enemy: " + enemy.enemyName;
+        resultPlayerPowerText.text = "Player Final Power: " + result.finalPlayerPower;
+        resultEnemyPowerText.text = "Enemy Final Power: " + result.finalEnemyPower;
+        resultExpText.text = "EXP Gained: " + result.expGained;
+        resultTokensText.text = "Arena Tokens Gained: " + result.tokensGained;
+        resultMessageText.text = result.isVictory
+            ? "The crowd roars as your challenger falls. Rewards are ready for the next Arena progression pass."
+            : "You survive the duel, but the Arena grants only a small lesson for this defeat.";
+
+        resultPanel.SetActive(true);
+    }
+
+    private void HideResult()
+    {
+        if (resultPanel != null)
+            resultPanel.SetActive(false);
     }
 
     private int CalculateExpReward(ArenaEnemyData enemy)
