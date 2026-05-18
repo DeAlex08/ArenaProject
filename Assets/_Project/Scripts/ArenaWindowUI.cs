@@ -105,6 +105,7 @@ public class ArenaWindowUI : MonoBehaviour
     private TMP_Text resultExpText;
     private TMP_Text resultTokensText;
     private TMP_Text resultMessageText;
+    private TMP_Text arenaTokensText;
     private int selectedEnemyIndex = -1;
 
     private readonly Color panelColor = new Color(0.015f, 0.013f, 0.012f, 0.985f);
@@ -127,6 +128,7 @@ public class ArenaWindowUI : MonoBehaviour
     private void OnEnable()
     {
         BuildIfNeeded();
+        RefreshArenaTokensText();
         HideEnemyInfo();
         HideResult();
     }
@@ -148,6 +150,7 @@ public class ArenaWindowUI : MonoBehaviour
             return;
 
         ArenaFightResult result = RunPseudoBattle(enemy);
+        ApplyFightRewards(result);
         HideEnemyInfo();
         ShowResult(enemy, result);
 
@@ -241,7 +244,7 @@ public class ArenaWindowUI : MonoBehaviour
         summaryElement.preferredHeight = 62f;
 
         CreateStatusLabel("RankText", summary.transform, "Rank: " + rank);
-        CreateStatusLabel("ArenaTokensText", summary.transform, "Arena Tokens: " + arenaTokens);
+        arenaTokensText = CreateStatusLabel("ArenaTokensText", summary.transform, BuildArenaTokensText());
     }
 
     private void BuildEnemies()
@@ -567,6 +570,82 @@ public class ArenaWindowUI : MonoBehaviour
             : "You survive the duel, but the Arena grants only a small lesson for this defeat.";
 
         resultPanel.SetActive(true);
+    }
+
+    private void ApplyFightRewards(ArenaFightResult result)
+    {
+        if (playerStats == null)
+        {
+            Debug.LogWarning("ArenaWindowUI: Cannot apply Arena rewards because PlayerStats is not assigned.");
+            return;
+        }
+
+        int levelsGained = 0;
+
+        if (result.expGained > 0)
+            levelsGained = playerStats.AddExperience(result.expGained);
+
+        if (result.tokensGained > 0)
+            playerStats.AddArenaTokens(result.tokensGained);
+
+        if (levelsGained > 0)
+        {
+            EquipmentManager equipmentManager = FindFirstObjectByType<EquipmentManager>();
+            if (equipmentManager != null)
+                equipmentManager.RefreshPlayerStats();
+            else
+                playerStats.RecalculateStats();
+        }
+
+        RefreshProgressionUI();
+
+        Debug.Log(
+            "ArenaWindowUI: Applied Arena rewards. EXP: " +
+            result.expGained +
+            ", Arena Tokens: " +
+            result.tokensGained +
+            ", Levels gained: " +
+            levelsGained);
+    }
+
+    private void RefreshProgressionUI()
+    {
+        RefreshArenaTokensText();
+
+        PlayerProfileUI profileUI = FindFirstObjectByType<PlayerProfileUI>();
+        if (profileUI != null)
+            profileUI.RefreshProfile();
+
+        PlayerBarsUI barsUI = FindFirstObjectByType<PlayerBarsUI>();
+        if (barsUI != null)
+            barsUI.RefreshBars();
+
+        PlayerStatsWindowUI statsWindowUI = FindFirstObjectByType<PlayerStatsWindowUI>();
+        if (statsWindowUI != null)
+            statsWindowUI.Refresh();
+
+        CharacterPanelStatsViewUI characterStatsView = FindFirstObjectByType<CharacterPanelStatsViewUI>();
+        if (characterStatsView != null)
+            characterStatsView.Refresh();
+    }
+
+    private void RefreshArenaTokensText()
+    {
+        if (arenaTokensText != null)
+            arenaTokensText.text = BuildArenaTokensText();
+    }
+
+    private string BuildArenaTokensText()
+    {
+        return "Arena Tokens: " + GetArenaTokens();
+    }
+
+    private int GetArenaTokens()
+    {
+        if (playerStats != null)
+            return playerStats.arenaTokens;
+
+        return arenaTokens;
     }
 
     private void HideResult()

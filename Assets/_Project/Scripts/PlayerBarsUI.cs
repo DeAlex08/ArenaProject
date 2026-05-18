@@ -24,22 +24,28 @@ public class PlayerBarsUI : MonoBehaviour
 
     public void RefreshBars()
     {
+        if (playerStats == null)
+            return;
+
+        if (hpFill == null || mpFill == null || expFill == null)
+            return;
+
         hpFill.fillAmount =
-            (float)playerStats.currentHp / playerStats.maxHp;
+            playerStats.maxHp > 0 ? (float)playerStats.currentHp / playerStats.maxHp : 0f;
 
         mpFill.fillAmount =
-            (float)playerStats.currentMp / playerStats.maxMp;
+            playerStats.maxMp > 0 ? (float)playerStats.currentMp / playerStats.maxMp : 0f;
 
         expFill.fillAmount =
-            (float)playerStats.currentExp / playerStats.maxExp;
+            playerStats.maxExp > 0 ? (float)playerStats.currentExp / playerStats.maxExp : 0f;
 
-        hpText.text =
-            playerStats.currentHp.ToString();
+        if (hpText != null)
+            hpText.text = playerStats.currentHp.ToString();
 
-        mpText.text =
-            playerStats.currentMp.ToString();
+        if (mpText != null)
+            mpText.text = playerStats.currentMp.ToString();
 
-        expText.text =
-            playerStats.currentExp.ToString() + "%";
+        if (expText != null)
+            expText.text = playerStats.currentExp + "/" + playerStats.maxExp;
     }
 }

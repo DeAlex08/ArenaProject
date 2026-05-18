@@ -4923,6 +4923,7 @@ MonoBehaviour:
   maxMp: 1000
   currentExp: 35
   maxExp: 100
+  arenaTokens: 0
   baseHp: 100
   baseMp: 100
   hpPerEndurance: 10

@@ -28,6 +28,9 @@ public class PlayerStats : MonoBehaviour
     public int currentExp = 35;
     public int maxExp = 100;
 
+    [Header("Currencies")]
+    public int arenaTokens = 0;
+
     [Header("Resource Scaling")]
     public int baseHp = 100;
     public int baseMp = 100;
@@ -180,12 +183,60 @@ public class PlayerStats : MonoBehaviour
         RecalculateStats();
     }
 
+    public int AddExperience(int amount)
+    {
+        if (amount <= 0)
+            return 0;
+
+        currentExp += amount;
+        int levelsGained = 0;
+
+        while (maxExp > 0 && currentExp >= maxExp)
+        {
+            currentExp -= maxExp;
+            maxExp = CalculateNextMaxExp(maxExp);
+            LevelUp();
+            levelsGained++;
+
+            Debug.Log("PlayerStats: Level up! New level: " + level);
+        }
+
+        Debug.Log(
+            "PlayerStats: Added EXP: " +
+            amount +
+            ". Current EXP: " +
+            currentExp +
+            "/" +
+            maxExp);
+
+        return levelsGained;
+    }
+
+    public void AddArenaTokens(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        arenaTokens += amount;
+
+        Debug.Log(
+            "PlayerStats: Added Arena Tokens: " +
+            amount +
+            ". Total Arena Tokens: " +
+            arenaTokens);
+    }
+
     public void SyncAvailableStatPointsWithLevel()
     {
         int earnedPoints = Mathf.Max(level - 1, 0) * statPointsPerLevel;
         int unspentPoints = earnedPoints - GetAllocatedStatPoints();
 
         availableStatPoints = Mathf.Max(availableStatPoints, unspentPoints);
+    }
+
+    private int CalculateNextMaxExp(int currentRequiredExp)
+    {
+        return Mathf.Max(Mathf.RoundToInt(currentRequiredExp * 1.2f), currentRequiredExp + 25);
     }
 
     public int GetAllocatedStatPoints()

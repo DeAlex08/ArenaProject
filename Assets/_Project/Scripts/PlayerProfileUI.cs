@@ -12,14 +12,22 @@ public class PlayerProfileUI : MonoBehaviour
     [SerializeField] private TMP_Text combatPowerText;
 
     private void Update()
-{
-    RefreshProfile();
-}
+    {
+        RefreshProfile();
+    }
 
     public void RefreshProfile()
     {
-        playerNameText.text = playerStats.playerName;
-        levelText.text = "LVL " + playerStats.level;
-        combatPowerText.text = playerStats.combatPower.ToString();
+        if (playerStats == null)
+            return;
+
+        if (playerNameText != null)
+            playerNameText.text = playerStats.playerName;
+
+        if (levelText != null)
+            levelText.text = "LVL " + playerStats.level;
+
+        if (combatPowerText != null)
+            combatPowerText.text = playerStats.combatPower.ToString();
     }
 }
