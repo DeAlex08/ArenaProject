@@ -590,11 +590,18 @@ public class ArenaWindowUI : MonoBehaviour
 
         if (levelsGained > 0)
         {
-            EquipmentManager equipmentManager = FindFirstObjectByType<EquipmentManager>();
+            EquipmentManager equipmentManager = FindEquipmentManager();
             if (equipmentManager != null)
+            {
                 equipmentManager.RefreshPlayerStats();
+            }
             else
+            {
+                Debug.LogWarning(
+                    "ArenaWindowUI: EquipmentManager was not found after level up. " +
+                    "Refreshing PlayerStats without equipment bonuses.");
                 playerStats.RecalculateStats();
+            }
         }
 
         RefreshProgressionUI();
@@ -646,6 +653,26 @@ public class ArenaWindowUI : MonoBehaviour
             return playerStats.arenaTokens;
 
         return arenaTokens;
+    }
+
+    private EquipmentManager FindEquipmentManager()
+    {
+        EquipmentManager[] managers = Resources.FindObjectsOfTypeAll<EquipmentManager>();
+        EquipmentManager fallbackManager = null;
+
+        foreach (EquipmentManager manager in managers)
+        {
+            if (manager == null || !manager.gameObject.scene.IsValid())
+                continue;
+
+            if (fallbackManager == null)
+                fallbackManager = manager;
+
+            if (playerStats != null && manager.playerStats == playerStats)
+                return manager;
+        }
+
+        return fallbackManager;
     }
 
     private void HideResult()
