@@ -36,6 +36,26 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks and Arena.
 
+## Current Project State After Equipment Persistence
+
+The project currently compiles at the script level and the main gameplay loop is:
+
+- player starts from saved or default progression data
+- player inventory is restored from local JSON if saved inventory data exists
+- equipped slots are restored from saved item instance IDs
+- equipment bonuses are reapplied through `EquipmentManager.RefreshPlayerStats()`
+- CharacterPanel progression UI refreshes from `PlayerStats`
+- Barracks inventory/equipment UI continues to use existing item instances and equipment state
+- Arena rewards still apply EXP and Arena Tokens through `PlayerStats`
+
+Current known limitations:
+
+- only one local save profile exists
+- there is no explicit New Game / Reset UI button yet
+- save format has no version/migration field yet
+- item persistence depends on every real item having a stable `ItemData.itemId`
+- inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
+
 ## Core Architecture
 
 ### LocationNavigationController
@@ -171,7 +191,7 @@ It reads `currentHp`, `maxHp`, `currentMp`, `maxMp`, `currentExp`, and `maxExp` 
 
 ### PlayerSaveManager
 
-`PlayerSaveManager` is Save System v1 for local player progression.
+`PlayerSaveManager` is Save System v1 for local player progression, inventory, and equipment.
 
 Current persistence approach:
 
@@ -179,7 +199,7 @@ Current persistence approach:
 - stored in `Application.persistentDataPath`
 - file name: `arena_player_progression.json`
 
-Saved fields:
+Saved progression fields:
 
 - level
 - current EXP
@@ -189,6 +209,16 @@ Saved fields:
 - allocated stat points
 
 The allocated stat fields are saved together with available stat points so spent points do not disappear after loading.
+
+Saved inventory fields:
+
+- owned item `instanceId`
+- owned item stable `itemId`
+
+Saved equipment fields:
+
+- equipped item `instanceId` by equipment slot
+- slots include helmet, weapon1, weapon2, armor, gloves, belt, legs, boots, ring1-ring4, amulet, and artifact
 
 New player defaults:
 
@@ -203,6 +233,9 @@ Save triggers:
 - gaining Arena Tokens through `PlayerStats.AddArenaTokens(int amount)`
 - level-up through `PlayerStats.LevelUp()`
 - manual stat allocation through `PlayerStats.TryAllocateStat(PlayerStatType statType)`
+- equipping an item through `EquipmentManager`
+- unequipping an item through `EquipmentManager`
+- inventory add/remove through `PlayerInventory`
 
 Load flow:
 
@@ -211,6 +244,10 @@ Load flow:
 - stats are recalculated
 - `PlayerStats` then searches inactive scene objects for a matching `EquipmentManager`
 - if a matching manager is found, `EquipmentManager.RefreshPlayerStats()` reapplies equipment bonuses through the existing equipment flow
+- `PlayerInventory.Start()` normalizes missing runtime item instance IDs
+- if saved inventory data exists, `PlayerInventory` rebuilds owned item instances from `ItemDatabase`
+- `EquipmentManager.RestoreEquipmentFromSave()` restores equipped slots from saved item instance IDs
+- restored equipment is refreshed once through the existing equipment stat flow
 
 Development reset:
 
@@ -259,6 +296,9 @@ Current completed or working systems:
 - persistent level/current EXP/required EXP
 - persistent Arena Tokens
 - persistent available and allocated stat points
+- persistent inventory item instances
+- persistent equipped item slots
+- stable item IDs for saved inventory
 - context menu reset for local progression save
 
 ## Progression And Save System v1
