@@ -4750,6 +4750,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 860383131}
+  - component: {fileID: 860383132}
   m_Layer: 5
   m_Name: MainLocationPanel
   m_TagString: Untagged
@@ -4777,6 +4778,23 @@ RectTransform:
   m_AnchoredPosition: {x: 430, y: 0}
   m_SizeDelta: {x: 1050, y: 900}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &860383132
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 860383130}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27bdcd81f6c247209f92d8504428da5f, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  locationWindows:
+  - locationId: 0
+    displayName: "\u041A\u0430\u0437\u0430\u0440\u043C\u044B"
+    window: {fileID: 2007480604}
+    barracksWindowUI: {fileID: 2007480610}
 --- !u!1 &873055261
 GameObject:
   m_ObjectHideFlags: 0
@@ -9622,6 +9640,7 @@ GameObject:
   - component: {fileID: 1701289758}
   - component: {fileID: 1701289757}
   - component: {fileID: 1701289756}
+  - component: {fileID: 1701289759}
   m_Layer: 5
   m_Name: BarracksButton
   m_TagString: Untagged
@@ -9693,9 +9712,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2007480610}
-        m_TargetAssemblyTypeName: BarracksWindowUI, Assembly-CSharp
-        m_MethodName: OpenBarracks
+      - m_Target: {fileID: 1701289759}
+        m_TargetAssemblyTypeName: BuildingButton, Assembly-CSharp
+        m_MethodName: HandleClick
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -9705,6 +9724,21 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!114 &1701289759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1701289754}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ab921b22b7f4be982e8fd1126743272, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  locationId: 0
+  displayName: "\u041A\u0430\u0437\u0430\u0440\u043C\u044B"
+  navigationController: {fileID: 860383132}
 --- !u!114 &1701289757
 MonoBehaviour:
   m_ObjectHideFlags: 0
