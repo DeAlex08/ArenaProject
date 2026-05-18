@@ -92,8 +92,7 @@ public class LocationNavigationController : MonoBehaviour
 
         foreach (LocationWindowBinding binding in locationWindows)
         {
-            if (binding != null && binding.window != null)
-                binding.window.SetActive(false);
+            CloseBinding(binding);
         }
 
         foreach (string windowName in GetAllLocationWindowNames())
@@ -103,6 +102,21 @@ public class LocationNavigationController : MonoBehaviour
             if (window != null)
                 window.SetActive(false);
         }
+    }
+
+    private void CloseBinding(LocationWindowBinding binding)
+    {
+        if (binding == null)
+            return;
+
+        if (binding.barracksWindowUI != null)
+        {
+            binding.barracksWindowUI.CloseBarracks();
+            return;
+        }
+
+        if (binding.window != null)
+            binding.window.SetActive(false);
     }
 
     private LocationWindowBinding GetBinding(LocationId locationId)

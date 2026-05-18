@@ -14016,9 +14016,9 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 2007480610}
-        m_TargetAssemblyTypeName: BarracksWindowUI, Assembly-CSharp
-        m_MethodName: CloseBarracks
+      - m_Target: {fileID: 860383132}
+        m_TargetAssemblyTypeName: LocationNavigationController, Assembly-CSharp
+        m_MethodName: CloseCurrentLocation
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
