@@ -36,7 +36,7 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks and Arena.
 
-## Current Project State After Arena Enemy Generation v1
+## Current Project State After Combat Playback v1
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -51,6 +51,8 @@ The project currently compiles at the script level and the main gameplay loop is
 - Arena has a free `Refresh Opponents` button that regenerates the enemy list
 - EnemyInfoPanel shows the generated combat details for the selected opponent
 - selecting Fight runs Combat Simulation v1 through `CombatSimulator`
+- after Fight, ArenaWindow opens `CombatPlaybackPanel` before showing ResultPanel
+- Combat Playback visually plays already-calculated combat events and does not recalculate the fight
 - player can choose Arena combat stance in ArenaWindow before fighting
 - selected player stance is persisted in the local JSON save
 - Arena ResultPanel shows Victory, Defeat, or Draw
@@ -66,7 +68,7 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
-- Combat Simulation v1 has no animation layer yet
+- Combat Playback v1 exists as a side-view Arena layout, but uses simple UI placeholder silhouettes and lightweight UI motion only
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
 - shield blocking is supported in code but no shield item type/data exists yet
 - Arena enemies are generated from current player combat power, but are not saved yet
@@ -126,6 +128,7 @@ Current Arena features:
 - `Refresh Opponents` regenerates the current easy/balanced/hard opponent set for free
 - `EnemyInfoPanel` opens inside ArenaWindow for selected enemy details and displays generated combat stats
 - compact player stance selector lives inside ArenaWindow
+- `CombatPlaybackPanel` opens after pressing Fight and before ResultPanel
 - `ResultPanel` opens inside ArenaWindow after Combat Simulation v1
 - `BattleLogPanel` opens inside ArenaWindow from the ResultPanel Battle Log button
 - no real animated combat scene exists yet
@@ -137,11 +140,13 @@ Important ArenaWindow responsibilities:
 - convert generated Arena enemy data into `CombatSimulator.FighterData`
 - convert current `PlayerStats` into `CombatSimulator.FighterData`
 - call `CombatSimulator.Simulate(...)`
+- pass calculated combat events to `CombatPlaybackUI`
 - calculate and apply rewards based on combat outcome
 - show and save player-selected combat stance
 - visually highlight the selected stance button
 - load saved stance on ArenaWindow initialization / enable
 - keep ResultPanel, EnemyInfoPanel, and BattleLogPanel inside ArenaWindow
+- keep CombatPlaybackPanel inside ArenaWindow
 - keep Continue behavior scoped to closing only ResultPanel
 - keep Battle Log behavior scoped to opening/closing only BattleLogPanel
 - do not apply stat/equipment/save logic directly outside existing `PlayerStats` and save flows
@@ -183,6 +188,7 @@ Important behavior:
 - weapon block reduces roughly 50% damage
 - shield block reduces most damage and is prepared for future shield items
 - CombatSimulator does not apply rewards or save data directly
+- CombatSimulator returns structured playback events as calculation output, but does not play visuals
 - `ArenaWindowUI` remains responsible for UI flow and reward application
 - `CombatResult` returns combat statistics for ResultPanel:
   - damage dealt
@@ -383,9 +389,11 @@ Current completed or working systems:
 - free Arena opponent refresh
 - Arena `EnemyInfoPanel`
 - Arena Combat Simulation v1
+- Arena Combat Playback v1
 - Arena combat stance selector UI
 - Arena `ResultPanel`
 - Arena `BattleLogPanel`
+- Arena `CombatPlaybackPanel`
 - round-by-round combat log
 - combat result stats: remaining HP, damage dealt, crits, dodges, blocks
 - Victory / Defeat / Draw Arena outcomes
@@ -600,6 +608,56 @@ Combat Simulation v1:
 - if remaining HP percentages are close enough, the result is Draw
 - if both fighters die in the same round, the result is Draw
 
+Combat Playback v1:
+
+- lives inside `ArenaWindow`
+- uses `CombatPlaybackUI`
+- opens after pressing Fight and before ResultPanel
+- uses already-calculated `CombatSimulator.CombatPlaybackEvent` data
+- does not recalculate combat
+- is not intended to be a popup/card modal
+- keeps the existing player `CharacterPanel` visible on the left side of the screen
+- transforms the right Arena area into a side-view battle layout
+- shows a central battlefield/stage between the left CharacterPanel area and the right EnemyPanel
+- shows a mirrored `EnemyPanel` on the right side
+- EnemyPanel shows enemy portrait placeholder, enemy name, weapon slots, HP bar, and MP bar
+- EnemyPanel does not show EXP
+- shows player and enemy fighter placeholders/models on the central battlefield facing each other
+- uses placeholder portrait/silhouette panels for now, structured so real sprites/models can be added later
+- current fighter placeholders are temporary only
+- future combat presentation should evolve toward modular 2D puppet fighters rather than single static PNG characters
+- future fighter puppet structure should support separate visual parts:
+  - Body
+  - Head
+  - LeftArm
+  - RightArm
+  - LeftWeapon
+  - RightWeapon
+  - Legs
+- future animation should be able to move body parts independently:
+  - attack
+  - block
+  - dodge
+  - counter
+  - hit
+  - crit
+  - death
+- shows player and enemy names plus stances near the battlefield fighters
+- plays events in sequence with short delays
+- animates enemy HP bar and lightweight battlefield HP text as damage happens
+- uses simple UI movement for center-stage attacks
+- flashes the hit/dodging battlefield fighter, and flashes the enemy portrait when the enemy is hit
+- shows floating combat text near the hit/dodging fighter:
+  - damage numbers
+  - BLOCK
+  - DODGE
+  - CRIT
+  - COUNTER
+- has a `Skip` button
+- Skip appears after 2 seconds or after the first hit/dodge exchange
+- pressing Skip ends playback immediately and shows ResultPanel
+- ResultPanel and Battle Log remain available after playback
+
 Combat stances:
 
 - Aggressive: attacks with both hands and does not block
@@ -654,6 +712,8 @@ Combat log behavior:
 - ResultPanel has a `Battle Log` button
 - BattleLogPanel is opened inside ArenaWindow
 - BattleLogPanel closes independently and does not close ResultPanel or ArenaWindow
+- Battle Log still uses the full text log generated by `CombatSimulator`
+- Combat Playback uses structured playback events from the same calculated fight
 
 EXP reward multiplier:
 
@@ -724,17 +784,18 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Add Combat Playback v1 inside ArenaWindow
-2. Add explicit New Game / Reset Progress debug UI
-3. Add save versioning / migration guard before save data grows further
-4. Test and tune generated Arena enemy balance against real saved characters
-5. Add Arena rank progression and token economy later
-6. Add Arena combat balance pass after testing real outcomes
+1. Add Combat Fighter Puppet v1
+2. Test Combat Playback v1 timing/readability on mobile aspect ratios
+3. Add explicit New Game / Reset Progress debug UI
+4. Add save versioning / migration guard before save data grows further
+5. Test and tune generated Arena enemy balance against real saved characters
+6. Add Arena rank progression and token economy later
+7. Add Arena combat balance pass after testing real outcomes
 
 Good follow-up systems:
 
 - Arena token shop
 - item rewards / loot drops saved through `PlayerInventory.AddItem`
 - combat balance pass for dodge, block, crit, and damage formulas
-- lightweight auto-battle visualization or combat replay layer after Combat Playback v1
+- improve Combat Playback with modular puppet parts, VFX, pacing controls, or replay support
 - shield item type / shield equipment slot if the design needs shield blocking

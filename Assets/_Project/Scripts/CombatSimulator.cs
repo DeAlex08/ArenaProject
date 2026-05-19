@@ -36,6 +36,14 @@ public static class CombatSimulator
 {
     public const int MaxRounds = 20;
 
+    public enum CombatPlaybackEventType
+    {
+        RoundStart,
+        Hit,
+        Dodge,
+        RoundEnd
+    }
+
     public class FighterData
     {
         public string fighterName;
@@ -76,6 +84,26 @@ public static class CombatSimulator
         public CombatStance playerStance;
         public CombatStance enemyStance;
         public string combatLog;
+        public List<CombatPlaybackEvent> playbackEvents = new List<CombatPlaybackEvent>();
+    }
+
+    public class CombatPlaybackEvent
+    {
+        public CombatPlaybackEventType eventType;
+        public int round;
+        public bool sourceIsPlayer;
+        public bool targetIsPlayer;
+        public string sourceName;
+        public string targetName;
+        public string targetZone;
+        public int damage;
+        public bool wasBlocked;
+        public bool wasDodged;
+        public bool wasCrit;
+        public bool wasCounter;
+        public int playerHp;
+        public int enemyHp;
+        public string message;
     }
 
     private class FighterState
@@ -114,6 +142,7 @@ public static class CombatSimulator
         FighterState enemy = CreateState(enemyData, "Enemy", false);
 
         StringBuilder log = new StringBuilder();
+        List<CombatPlaybackEvent> playbackEvents = new List<CombatPlaybackEvent>();
         log.AppendLine("Arena battle begins.");
         log.AppendLine("[STANCE] " + player.data.fighterName + ": " + player.data.stance);
         log.AppendLine("[STANCE] " + enemy.data.fighterName + ": " + enemy.data.stance);
@@ -133,8 +162,10 @@ public static class CombatSimulator
             LogPlan(log, enemy.data.fighterName, enemyPlan);
             log.AppendLine("");
 
-            ResolvePrimaryAttacks(player, enemy, playerPlan, enemyPlan, log);
-            ResolvePrimaryAttacks(enemy, player, enemyPlan, playerPlan, log);
+            playbackEvents.Add(CreateRoundEvent(CombatPlaybackEventType.RoundStart, round, player, enemy, "Round " + round));
+
+            ResolvePrimaryAttacks(player, enemy, playerPlan, enemyPlan, round, log, playbackEvents);
+            ResolvePrimaryAttacks(enemy, player, enemyPlan, playerPlan, round, log, playbackEvents);
 
             log.AppendLine(
                 "End of round: " +
@@ -150,6 +181,13 @@ public static class CombatSimulator
                 "/" +
                 enemy.data.maxHp);
             log.AppendLine("");
+
+            playbackEvents.Add(CreateRoundEvent(
+                CombatPlaybackEventType.RoundEnd,
+                round,
+                player,
+                enemy,
+                "Round " + round + " ends"));
 
             if (player.IsDead || enemy.IsDead)
                 break;
@@ -179,7 +217,8 @@ public static class CombatSimulator
             enemyBlocks = enemy.blocks,
             playerStance = player.data.stance,
             enemyStance = enemy.data.stance,
-            combatLog = log.ToString()
+            combatLog = log.ToString(),
+            playbackEvents = playbackEvents
         };
     }
 
@@ -265,11 +304,13 @@ public static class CombatSimulator
         FighterState defender,
         RoundPlan attackerPlan,
         RoundPlan defenderPlan,
-        StringBuilder log)
+        int round,
+        StringBuilder log,
+        List<CombatPlaybackEvent> playbackEvents)
     {
         for (int i = 0; i < attackerPlan.attacks; i++)
         {
-            ResolveAttack(attacker, defender, defenderPlan, false, log);
+            ResolveAttack(attacker, defender, defenderPlan, round, false, log, playbackEvents);
         }
     }
 
@@ -277,8 +318,10 @@ public static class CombatSimulator
         FighterState attacker,
         FighterState defender,
         RoundPlan defenderPlan,
+        int round,
         bool isCounter,
-        StringBuilder log)
+        StringBuilder log,
+        List<CombatPlaybackEvent> playbackEvents)
     {
         CombatBodyZone targetZone = GetRandomBodyZone();
         string attackLabel = isCounter ? "counterattacks" : "attacks";
@@ -288,9 +331,10 @@ public static class CombatSimulator
             defender.dodges++;
 
             log.AppendLine("[DODGE] " + attacker.data.fighterName + " " + attackLabel + " " + FormatZone(targetZone) + ", but " + defender.data.fighterName + " dodges.");
+            playbackEvents.Add(CreateDodgeEvent(attacker, defender, targetZone, round, isCounter));
 
             if (!isCounter)
-                TryCounter(defender, attacker, log);
+                TryCounter(defender, attacker, round, log, playbackEvents);
 
             return;
         }
@@ -328,9 +372,10 @@ public static class CombatSimulator
             " damage." +
             blockText +
             critText);
+        playbackEvents.Add(CreateHitEvent(attacker, defender, targetZone, round, damage, isBlocked, isCrit, isCounter));
 
         if (isBlocked && !isCounter)
-            TryCounter(defender, attacker, log);
+            TryCounter(defender, attacker, round, log, playbackEvents);
     }
 
     private static bool RollDodge(FighterData defender)
@@ -349,7 +394,12 @@ public static class CombatSimulator
         return Random.Range(0f, 100f) < chance;
     }
 
-    private static void TryCounter(FighterState counterAttacker, FighterState originalAttacker, StringBuilder log)
+    private static void TryCounter(
+        FighterState counterAttacker,
+        FighterState originalAttacker,
+        int round,
+        StringBuilder log,
+        List<CombatPlaybackEvent> playbackEvents)
     {
         if (counterAttacker.IsDead || originalAttacker.IsDead)
             return;
@@ -360,7 +410,7 @@ public static class CombatSimulator
             return;
 
         log.AppendLine("[COUNTER] " + counterAttacker.data.fighterName + " finds an opening for a counterattack.");
-        ResolveAttack(counterAttacker, originalAttacker, new RoundPlan(), true, log);
+        ResolveAttack(counterAttacker, originalAttacker, new RoundPlan(), round, true, log, playbackEvents);
     }
 
     private static int CalculateDamage(
@@ -423,6 +473,88 @@ public static class CombatSimulator
     private static CombatBodyZone GetRandomBodyZone()
     {
         return BodyZones[Random.Range(0, BodyZones.Length)];
+    }
+
+    private static CombatPlaybackEvent CreateRoundEvent(
+        CombatPlaybackEventType eventType,
+        int round,
+        FighterState player,
+        FighterState enemy,
+        string message)
+    {
+        return new CombatPlaybackEvent
+        {
+            eventType = eventType,
+            round = round,
+            playerHp = Mathf.Max(player.currentHp, 0),
+            enemyHp = Mathf.Max(enemy.currentHp, 0),
+            message = message
+        };
+    }
+
+    private static CombatPlaybackEvent CreateDodgeEvent(
+        FighterState attacker,
+        FighterState defender,
+        CombatBodyZone targetZone,
+        int round,
+        bool isCounter)
+    {
+        return new CombatPlaybackEvent
+        {
+            eventType = CombatPlaybackEventType.Dodge,
+            round = round,
+            sourceIsPlayer = attacker.isPlayer,
+            targetIsPlayer = defender.isPlayer,
+            sourceName = attacker.data.fighterName,
+            targetName = defender.data.fighterName,
+            targetZone = FormatZone(targetZone),
+            wasDodged = true,
+            wasCounter = isCounter,
+            playerHp = GetPlayerHp(attacker, defender),
+            enemyHp = GetEnemyHp(attacker, defender),
+            message = defender.data.fighterName + " dodges"
+        };
+    }
+
+    private static CombatPlaybackEvent CreateHitEvent(
+        FighterState attacker,
+        FighterState defender,
+        CombatBodyZone targetZone,
+        int round,
+        int damage,
+        bool isBlocked,
+        bool isCrit,
+        bool isCounter)
+    {
+        return new CombatPlaybackEvent
+        {
+            eventType = CombatPlaybackEventType.Hit,
+            round = round,
+            sourceIsPlayer = attacker.isPlayer,
+            targetIsPlayer = defender.isPlayer,
+            sourceName = attacker.data.fighterName,
+            targetName = defender.data.fighterName,
+            targetZone = FormatZone(targetZone),
+            damage = damage,
+            wasBlocked = isBlocked,
+            wasCrit = isCrit,
+            wasCounter = isCounter,
+            playerHp = GetPlayerHp(attacker, defender),
+            enemyHp = GetEnemyHp(attacker, defender),
+            message = attacker.data.fighterName + " hits " + defender.data.fighterName
+        };
+    }
+
+    private static int GetPlayerHp(FighterState first, FighterState second)
+    {
+        FighterState player = first.isPlayer ? first : second;
+        return Mathf.Max(player.currentHp, 0);
+    }
+
+    private static int GetEnemyHp(FighterState first, FighterState second)
+    {
+        FighterState enemy = first.isPlayer ? second : first;
+        return Mathf.Max(enemy.currentHp, 0);
     }
 
     private static CombatOutcome DetermineOutcome(FighterState player, FighterState enemy)

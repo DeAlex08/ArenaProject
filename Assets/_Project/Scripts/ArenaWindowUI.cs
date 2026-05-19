@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -34,6 +35,7 @@ public class ArenaWindowUI : MonoBehaviour
         public CombatStance playerStance;
         public CombatStance enemyStance;
         public string combatLog;
+        public List<CombatSimulator.CombatPlaybackEvent> playbackEvents;
     }
 
     [System.Serializable]
@@ -97,6 +99,7 @@ public class ArenaWindowUI : MonoBehaviour
     private TMP_Text resultExpText;
     private TMP_Text resultTokensText;
     private TMP_Text resultMessageText;
+    private CombatPlaybackUI combatPlaybackUI;
     private GameObject battleLogPanel;
     private TMP_Text battleLogText;
     private TMP_Text arenaTokensText;
@@ -136,7 +139,13 @@ public class ArenaWindowUI : MonoBehaviour
         HideEnemyInfo();
         HideResult();
         HideBattleLog();
+        HideCombatPlayback();
         selectedEnemyIndex = -1;
+    }
+
+    private void OnDisable()
+    {
+        HideCombatPlayback();
     }
 
     public void Close()
@@ -156,12 +165,13 @@ public class ArenaWindowUI : MonoBehaviour
             return;
 
         ArenaFightResult result = RunPseudoBattle(enemy);
-        ApplyFightRewards(result);
         HideEnemyInfo();
-        ShowResult(enemy, result);
+        HideResult();
+        HideBattleLog();
+        PlayCombatPlayback(enemy, result);
 
         Debug.Log(
-            "ArenaWindowUI: Fight result: " +
+            "ArenaWindowUI: Fight calculated: " +
             result.outcome +
             " | Enemy: " +
             enemy.enemyName +
@@ -208,6 +218,7 @@ public class ArenaWindowUI : MonoBehaviour
         BuildStanceSelector();
         BuildEnemies();
         BuildEnemyInfoPanel();
+        BuildCombatPlaybackPanel();
         BuildResultPanel();
         BuildBattleLogPanel();
     }
@@ -344,6 +355,7 @@ public class ArenaWindowUI : MonoBehaviour
         HideEnemyInfo();
         HideResult();
         HideBattleLog();
+        HideCombatPlayback();
         selectedEnemyIndex = -1;
 
         Debug.Log("ArenaWindowUI: Refreshed generated Arena opponents.");
@@ -517,6 +529,16 @@ public class ArenaWindowUI : MonoBehaviour
         infoFightButton.gameObject.GetComponent<LayoutElement>().flexibleWidth = 1f;
 
         HideEnemyInfo();
+    }
+
+    private void BuildCombatPlaybackPanel()
+    {
+        GameObject playbackPanel = CreateLayoutObject("CombatPlaybackPanel", transform);
+        LayoutElement ignoreLayout = playbackPanel.AddComponent<LayoutElement>();
+        ignoreLayout.ignoreLayout = true;
+
+        combatPlaybackUI = playbackPanel.AddComponent<CombatPlaybackUI>();
+        combatPlaybackUI.StopAndHide();
     }
 
     private void BuildResultPanel()
@@ -778,10 +800,51 @@ public class ArenaWindowUI : MonoBehaviour
             enemyBlocks = combatResult.enemyBlocks,
             playerStance = combatResult.playerStance,
             enemyStance = combatResult.enemyStance,
-            combatLog = combatResult.combatLog
+            combatLog = combatResult.combatLog,
+            playbackEvents = combatResult.playbackEvents
         };
 
         return result;
+    }
+
+    private void PlayCombatPlayback(ArenaEnemyData enemy, ArenaFightResult result)
+    {
+        if (combatPlaybackUI == null)
+        {
+            FinishFight(enemy, result);
+            return;
+        }
+
+        CombatPlaybackUI.PlaybackData playbackData = new CombatPlaybackUI.PlaybackData
+        {
+            playerName = playerStats != null ? playerStats.playerName : "Player",
+            enemyName = enemy.enemyName,
+            playerStance = result.playerStance,
+            enemyStance = result.enemyStance,
+            playerStartHp = result.playerStartHp,
+            enemyStartHp = result.enemyStartHp,
+            events = result.playbackEvents
+        };
+
+        combatPlaybackUI.Play(playbackData, () => FinishFight(enemy, result));
+    }
+
+    private void FinishFight(ArenaEnemyData enemy, ArenaFightResult result)
+    {
+        ApplyFightRewards(result);
+        ShowResult(enemy, result);
+
+        Debug.Log(
+            "ArenaWindowUI: Fight result shown: " +
+            result.outcome +
+            " | Enemy: " +
+            enemy.enemyName +
+            " | Level: " + enemy.level +
+            " | Power: " + enemy.combatPower +
+            " | Player Stance: " + result.playerStance +
+            " | Enemy Stance: " + result.enemyStance +
+            " | EXP Gained: " + result.expGained +
+            " | Arena Tokens Gained: " + result.tokensGained);
     }
 
     private void ShowResult(ArenaEnemyData enemy, ArenaFightResult result)
@@ -962,6 +1025,12 @@ public class ArenaWindowUI : MonoBehaviour
     {
         if (resultPanel != null)
             resultPanel.SetActive(false);
+    }
+
+    private void HideCombatPlayback()
+    {
+        if (combatPlaybackUI != null)
+            combatPlaybackUI.StopAndHide();
     }
 
     private void ShowBattleLog()
