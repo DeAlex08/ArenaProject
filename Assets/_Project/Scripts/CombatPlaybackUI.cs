@@ -10,6 +10,15 @@ public class CombatPlaybackUI : MonoBehaviour
     private const string PlayerPoseResourceRoot = "Combat/FighterPoses/";
     private const string EnemyOrcPoseResourceRoot = "Combat/EnemyOrcPoses/";
     private const string EnemyPanelFrameResourcePath = "Combat/UI/EnemyPanelFrame";
+    private const string EnemyOrcPortraitResourcePath = "Combat/UI/EnemyOrcPortrait";
+    private const string ArenaBattlefieldBackgroundResourcePath = "Combat/UI/ArenaBattlefieldBackground";
+    private const float EnemyPanelWidth = 420f;
+    private const float EnemyPanelFrameHeight = 960f;
+    private const float EnemyPortraitSize = 382f;
+    private const float EnemyResourceBarWidth = 274f;
+    private const float EnemyResourceBarHeight = 30f;
+    private const float EnemyResourceBarPaddingX = 7f;
+    private const float EnemyResourceBarPaddingY = 6f;
 
     public class PlaybackData
     {
@@ -40,6 +49,7 @@ public class CombatPlaybackUI : MonoBehaviour
     private Coroutine skipDelayRoutine;
     private Action onPlaybackComplete;
     private readonly List<Coroutine> parallelRoutines = new List<Coroutine>();
+    private Color enemyPortraitDefaultColor = Color.clear;
 
     private TMP_Text stageTitleText;
     private TMP_Text playerStageText;
@@ -60,6 +70,8 @@ public class CombatPlaybackUI : MonoBehaviour
     private CombatFighterPuppetUI enemyPuppet;
     private RectTransform playerFighterRect;
     private RectTransform enemyFighterRect;
+    private RectTransform enemyHpFillRect;
+    private RectTransform enemyMpFillRect;
     private RectTransform floatingTextRect;
     private RectTransform floatingTextSecondaryRect;
     private PlayerStats playbackPlayerStats;
@@ -290,7 +302,9 @@ public class CombatPlaybackUI : MonoBehaviour
 
         playerPuppet.ResetPose();
         enemyPuppet.ResetPose();
-        enemyPortraitImage.color = portraitColor;
+
+        if (enemyPortraitImage != null)
+            enemyPortraitImage.color = enemyPortraitDefaultColor;
 
         if (skipButton != null)
             skipButton.gameObject.SetActive(false);
@@ -676,7 +690,7 @@ public class CombatPlaybackUI : MonoBehaviour
         yield return target.PlayHit(isCrit);
 
         if (!targetIsPlayer && enemyPortraitImage != null)
-            enemyPortraitImage.color = portraitColor;
+            enemyPortraitImage.color = enemyPortraitDefaultColor;
     }
 
     private IEnumerator AnimateDeathsIfNeeded(int playerHp, int enemyHp)
@@ -743,6 +757,8 @@ public class CombatPlaybackUI : MonoBehaviour
         if (enemyHpFill != null)
             enemyHpFill.fillAmount = Mathf.Clamp01(enemyFill);
 
+        SetFillWidth(enemyHpFillRect, enemyFill);
+
         if (enemyHpText != null)
             enemyHpText.text = currentEnemyHp + " / " + enemyStartHp;
     }
@@ -774,8 +790,26 @@ public class CombatPlaybackUI : MonoBehaviour
         if (enemyMpFill != null)
             enemyMpFill.fillAmount = Mathf.Clamp01(fillAmount);
 
+        SetFillWidth(enemyMpFillRect, fillAmount);
+
         if (enemyMpText != null)
             enemyMpText.text = "100 / 100";
+    }
+
+    private void SetFillWidth(RectTransform fillRect, float fillAmount)
+    {
+        if (fillRect == null)
+            return;
+
+        fillAmount = Mathf.Clamp01(fillAmount);
+        fillRect.anchorMin = new Vector2(1f, 0f);
+        fillRect.anchorMax = new Vector2(1f, 1f);
+        fillRect.pivot = new Vector2(1f, 0.5f);
+        fillRect.anchoredPosition = new Vector2(-EnemyResourceBarPaddingX, 0f);
+        fillRect.sizeDelta = new Vector2(
+            Mathf.Max((EnemyResourceBarWidth - EnemyResourceBarPaddingX * 2f) * fillAmount, 0f),
+            -EnemyResourceBarPaddingY * 2f);
+        fillRect.localScale = Vector3.one;
     }
 
     private void StopRunningCoroutines()
@@ -823,9 +857,9 @@ public class CombatPlaybackUI : MonoBehaviour
         AddOutline(gameObject, borderColor, new Vector2(2f, -2f));
 
         HorizontalLayoutGroup layout = gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.padding = new RectOffset(34, 34, 34, 34);
-        layout.spacing = 30f;
-        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.padding = new RectOffset(34, 0, 0, 0);
+        layout.spacing = 24f;
+        layout.childAlignment = TextAnchor.UpperCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
@@ -839,12 +873,29 @@ public class CombatPlaybackUI : MonoBehaviour
     {
         GameObject stage = CreateLayoutObject("BattlefieldStage", transform);
         Image stageImage = stage.AddComponent<Image>();
-        stageImage.color = stageColor;
+        Sprite arenaBackground = Resources.Load<Sprite>(ArenaBattlefieldBackgroundResourcePath);
+        if (arenaBackground != null)
+        {
+            stageImage.sprite = arenaBackground;
+            stageImage.type = Image.Type.Simple;
+            stageImage.preserveAspect = false;
+            stageImage.color = Color.white;
+        }
+        else
+        {
+            stageImage.color = stageColor;
+            Debug.LogWarning("CombatPlaybackUI: Arena battlefield background sprite not found at Resources/" + ArenaBattlefieldBackgroundResourcePath);
+        }
         AddOutline(stage, darkBorderColor, new Vector2(2f, -2f));
 
         LayoutElement stageElement = stage.AddComponent<LayoutElement>();
         stageElement.minWidth = 900f;
         stageElement.flexibleWidth = 1f;
+
+        if (arenaBackground != null)
+            CreateBattlefieldReadabilityOverlay(stage.transform);
+
+        CreateStageFloor(stage.transform);
 
         stageTitleText = CreateText("StageTitle", stage.transform, "ARENA DUEL", 40, FontStyles.Bold, TextAlignmentOptions.Center);
         stageTitleText.color = titleColor;
@@ -878,8 +929,6 @@ public class CombatPlaybackUI : MonoBehaviour
         floatingTextSecondary = CreateText("FloatingTextSecondary", stage.transform, "", 38, FontStyles.Bold, TextAlignmentOptions.Center);
         floatingTextSecondaryRect = floatingTextSecondary.rectTransform;
         AnchorTo(floatingTextSecondaryRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(430f, 94f));
-
-        CreateStageFloor(stage.transform);
     }
 
     private RectTransform BuildStageFighter(Transform parent, string objectName, bool isPlayer)
@@ -915,11 +964,18 @@ public class CombatPlaybackUI : MonoBehaviour
     {
         GameObject floor = CreateLayoutObject("StageFloor", parent);
         Image floorImage = floor.AddComponent<Image>();
-        floorImage.color = new Color(0.10f, 0.075f, 0.045f, 0.9f);
+        floorImage.color = new Color(0.10f, 0.075f, 0.045f, 0.45f);
 
         RectTransform rect = floor.GetComponent<RectTransform>();
         AnchorTo(rect, new Vector2(0.5f, 0.28f), new Vector2(0.5f, 0.28f), Vector2.zero, new Vector2(720f, 18f));
-        floor.transform.SetAsFirstSibling();
+    }
+
+    private void CreateBattlefieldReadabilityOverlay(Transform parent)
+    {
+        GameObject overlay = CreateLayoutObject("BattlefieldReadabilityOverlay", parent);
+        Image overlayImage = overlay.AddComponent<Image>();
+        overlayImage.color = new Color(0.10f, 0.015f, 0.012f, 0.38f);
+        AnchorTo(overlay.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
     }
 
     private void BuildEnemyPanel()
@@ -931,10 +987,7 @@ public class CombatPlaybackUI : MonoBehaviour
 
         if (enemyPanelUsesFrame)
         {
-            panelImage.sprite = enemyPanelFrame;
-            panelImage.type = Image.Type.Simple;
-            panelImage.preserveAspect = false;
-            panelImage.color = Color.white;
+            panelImage.color = Color.clear;
         }
         else
         {
@@ -944,13 +997,14 @@ public class CombatPlaybackUI : MonoBehaviour
         }
 
         LayoutElement element = panel.AddComponent<LayoutElement>();
-        element.minWidth = 360f;
-        element.preferredWidth = 380f;
+        element.minWidth = EnemyPanelWidth;
+        element.preferredWidth = EnemyPanelWidth;
         element.flexibleWidth = 0f;
 
         if (enemyPanelUsesFrame)
         {
-            BuildFramedEnemyPanelContent(panel.transform);
+            GameObject frameRoot = CreateEnemyPanelFrameRoot(panel.transform, enemyPanelFrame);
+            BuildFramedEnemyPanelContent(frameRoot.transform);
             return;
         }
 
@@ -978,33 +1032,67 @@ public class CombatPlaybackUI : MonoBehaviour
         BuildResourceBar(panel.transform, "MP", false);
     }
 
+    private GameObject CreateEnemyPanelFrameRoot(Transform parent, Sprite frameSprite)
+    {
+        GameObject frameRoot = CreateLayoutObject("EnemyPanelFrameRoot", parent);
+        Image frameImage = frameRoot.AddComponent<Image>();
+        frameImage.sprite = frameSprite;
+        frameImage.type = Image.Type.Simple;
+        frameImage.preserveAspect = false;
+        frameImage.color = Color.white;
+
+        RectTransform frameRect = frameRoot.GetComponent<RectTransform>();
+        AnchorTo(
+            frameRect,
+            new Vector2(0.5f, 1f),
+            new Vector2(0.5f, 1f),
+            new Vector2(0f, -EnemyPanelFrameHeight * 0.5f),
+            new Vector2(EnemyPanelWidth, EnemyPanelFrameHeight));
+
+        // The current enemy HUD source has a taller portrait region than the left CharacterPanel.
+        // Keeping the parent panel full-height while compressing this frame upward preserves the
+        // battlefield width and leaves harmless empty space below the mirrored enemy HUD.
+        return frameRoot;
+    }
+
     private void BuildFramedEnemyPanelContent(Transform parent)
     {
         enemyNameText = CreateEnemyHudText("EnemyName", parent, 24, FontStyles.Normal, TextAlignmentOptions.Left);
-        AnchorTo(enemyNameText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(27f, -14f), new Vector2(205f, 44f));
+        AnchorTo(enemyNameText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(28f, -13f), new Vector2(205f, 44f));
         enemyNameText.rectTransform.pivot = new Vector2(0f, 1f);
 
         enemyLevelText = CreateEnemyHudText("EnemyLevel", parent, 22, FontStyles.Bold, TextAlignmentOptions.Right);
-        AnchorTo(enemyLevelText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-27f, -14f), new Vector2(185f, 44f));
+        AnchorTo(enemyLevelText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-28f, -13f), new Vector2(185f, 44f));
         enemyLevelText.rectTransform.pivot = new Vector2(1f, 1f);
 
         enemyPowerText = CreateEnemyHudText("EnemyPower", parent, 20, FontStyles.Bold, TextAlignmentOptions.Right);
-        AnchorTo(enemyPowerText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-30f, -58f), new Vector2(180f, 42f));
+        AnchorTo(enemyPowerText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-31f, -59f), new Vector2(180f, 42f));
         enemyPowerText.rectTransform.pivot = new Vector2(1f, 1f);
 
         GameObject portrait = CreatePanelBox("EnemyPortrait", parent, 0f);
-        AnchorTo(portrait.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -250f), new Vector2(340f, 465f));
-        enemyPortraitImage = portrait.GetComponent<Image>();
+        AnchorTo(portrait.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -225f), new Vector2(EnemyPortraitSize, EnemyPortraitSize));
+        portrait.AddComponent<RectMask2D>();
+
+        GameObject portraitImageObject = CreateLayoutObject("EnemyPortraitImage", portrait.transform);
+        enemyPortraitImage = portraitImageObject.AddComponent<Image>();
+        Sprite portraitSprite = Resources.Load<Sprite>(EnemyOrcPortraitResourcePath);
+        enemyPortraitImage.sprite = portraitSprite;
+        enemyPortraitImage.color = portraitSprite != null ? Color.white : Color.clear;
+        enemyPortraitImage.preserveAspect = true;
+        enemyPortraitDefaultColor = enemyPortraitImage.color;
+        AnchorTo(enemyPortraitImage.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(EnemyPortraitSize, 520f));
 
         TMP_Text portraitMark = CreateText("Mark", portrait.transform, "ENEMY", 42, FontStyles.Bold, TextAlignmentOptions.Center);
-        portraitMark.color = new Color(0.42f, 0.31f, 0.20f, 0.72f);
+        portraitMark.color = portraitSprite == null
+            ? new Color(0.42f, 0.31f, 0.20f, 0.72f)
+            : Color.clear;
         AnchorTo(portraitMark.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
         GameObject slots = BuildWeaponSlots(parent);
-        AnchorTo(slots.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -604f), new Vector2(334f, 204f));
+        AnchorTo(slots.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -606f), new Vector2(370f, 198f));
 
-        BuildFramedResourceBar(parent, "HP", true, -747f);
-        BuildFramedResourceBar(parent, "MP", false, -812f);
+        BuildFramedResourceBar(parent, "HP", true, -726f);
+        BuildFramedResourceBar(parent, "MP", false, -787f);
     }
 
     private TMP_Text CreateEnemyHudText(
@@ -1116,23 +1204,18 @@ public class CombatPlaybackUI : MonoBehaviour
         GameObject bar = CreateLayoutObject(label + "Bar", parent);
         Image barBackground = bar.AddComponent<Image>();
         barBackground.color = Color.clear;
-        AnchorTo(bar.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(78f, anchoredY), new Vector2(260f, 30f));
+        AnchorTo(bar.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(40f, anchoredY), new Vector2(EnemyResourceBarWidth, EnemyResourceBarHeight));
 
         GameObject fill = CreateLayoutObject("Fill", bar.transform);
         Image fillImage = fill.AddComponent<Image>();
         fillImage.color = isHp
             ? new Color(0.68f, 0.04f, 0.03f, 1f)
             : new Color(0.02f, 0.18f, 0.72f, 1f);
-        fillImage.type = Image.Type.Filled;
-        fillImage.fillMethod = Image.FillMethod.Horizontal;
-        fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fillImage.type = Image.Type.Simple;
         fillImage.fillAmount = 1f;
 
         RectTransform fillRect = fill.GetComponent<RectTransform>();
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.offsetMin = new Vector2(6f, 5f);
-        fillRect.offsetMax = new Vector2(-6f, -5f);
+        SetFillWidth(fillRect, 1f);
 
         TMP_Text valueText = CreateText("Value", bar.transform, "", 19, FontStyles.Bold, TextAlignmentOptions.Right);
         valueText.color = textColor;
@@ -1143,11 +1226,13 @@ public class CombatPlaybackUI : MonoBehaviour
         if (isHp)
         {
             enemyHpFill = fillImage;
+            enemyHpFillRect = fillRect;
             enemyHpText = valueText;
         }
         else
         {
             enemyMpFill = fillImage;
+            enemyMpFillRect = fillRect;
             enemyMpText = valueText;
         }
     }
