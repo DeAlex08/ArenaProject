@@ -502,9 +502,10 @@ public class CombatPlaybackUI : MonoBehaviour
         if (floatingTextRect == null)
             return;
 
+        bool targetIsPlayer = target == playerFighterRect;
         floatingTextRect.anchoredPosition = target == null
             ? new Vector2(0f, 150f)
-            : new Vector2(target.anchoredPosition.x, target.anchoredPosition.y + 185f);
+            : GetFloatingTextPosition(floatingTextRect, target, targetIsPlayer, 0);
 
         if (floatingTextSecondary != null)
             floatingTextSecondary.text = "";
@@ -515,11 +516,18 @@ public class CombatPlaybackUI : MonoBehaviour
         string playerText = BuildTargetFloatingText(exchangeEvents, true);
         string enemyText = BuildTargetFloatingText(exchangeEvents, false);
 
-        SetFloatingText(floatingText, floatingTextRect, playerText, GetTargetFloatingTextColor(exchangeEvents, true), playerFighterRect);
-        SetFloatingText(floatingTextSecondary, floatingTextSecondaryRect, enemyText, GetTargetFloatingTextColor(exchangeEvents, false), enemyFighterRect);
+        SetFloatingText(floatingText, floatingTextRect, playerText, GetTargetFloatingTextColor(exchangeEvents, true), playerFighterRect, true, 0);
+        SetFloatingText(floatingTextSecondary, floatingTextSecondaryRect, enemyText, GetTargetFloatingTextColor(exchangeEvents, false), enemyFighterRect, false, playerText.Length > 0 ? 1 : 0);
     }
 
-    private void SetFloatingText(TMP_Text text, RectTransform rect, string value, Color color, RectTransform target)
+    private void SetFloatingText(
+        TMP_Text text,
+        RectTransform rect,
+        string value,
+        Color color,
+        RectTransform target,
+        bool targetIsPlayer,
+        int stackIndex)
     {
         if (text == null)
             return;
@@ -530,7 +538,56 @@ public class CombatPlaybackUI : MonoBehaviour
         if (rect == null || target == null)
             return;
 
-        rect.anchoredPosition = new Vector2(target.anchoredPosition.x, target.anchoredPosition.y + 185f);
+        rect.anchoredPosition = GetFloatingTextPosition(rect, target, targetIsPlayer, stackIndex);
+    }
+
+    private Vector2 GetFloatingTextPosition(RectTransform textRect, RectTransform target, bool targetIsPlayer, int stackIndex)
+    {
+        if (target == null)
+            return new Vector2(0f, 150f);
+
+        RectTransform parentRect = textRect != null ? textRect.parent as RectTransform : null;
+        Vector2 localPosition;
+
+        if (parentRect != null)
+        {
+            Vector3 targetWorldPosition = target.TransformPoint(new Vector3(0f, target.rect.height * 0.28f, 0f));
+            localPosition = parentRect.InverseTransformPoint(targetWorldPosition);
+        }
+        else
+        {
+            localPosition = target.anchoredPosition;
+        }
+
+        float sideOffset = targetIsPlayer ? -36f : 36f;
+        float verticalOffset = 132f + stackIndex * 26f;
+        Vector2 position = localPosition + new Vector2(sideOffset, verticalOffset);
+
+        return ClampFloatingTextPosition(position, textRect, parentRect);
+    }
+
+    private Vector2 ClampFloatingTextPosition(Vector2 position, RectTransform textRect, RectTransform parentRect)
+    {
+        if (textRect == null || parentRect == null)
+            return position;
+
+        Vector2 textSize = textRect.rect.size;
+        float halfTextWidth = Mathf.Max(textSize.x * 0.5f, 140f);
+        float halfTextHeight = Mathf.Max(textSize.y * 0.5f, 42f);
+        Rect parentBounds = parentRect.rect;
+        float padding = 22f;
+
+        position.x = Mathf.Clamp(
+            position.x,
+            parentBounds.xMin + halfTextWidth + padding,
+            parentBounds.xMax - halfTextWidth - padding);
+
+        position.y = Mathf.Clamp(
+            position.y,
+            parentBounds.yMin + halfTextHeight + padding,
+            parentBounds.yMax - halfTextHeight - padding);
+
+        return position;
     }
 
     private string BuildTargetFloatingText(List<CombatSimulator.CombatPlaybackEvent> events, bool targetIsPlayer)
