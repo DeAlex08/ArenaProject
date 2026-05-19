@@ -20,6 +20,13 @@ public class CombatPlaybackUI : MonoBehaviour
     private const float EnemyResourceBarPaddingX = 7f;
     private const float EnemyResourceBarPaddingY = 6f;
 
+    [Header("Combat Audio Hooks")]
+    [SerializeField] private AudioClip slashClip;
+    [SerializeField] private AudioClip hitClip;
+    [SerializeField] private AudioClip critClip;
+    [SerializeField] private AudioClip blockClip;
+    [SerializeField] private AudioClip dodgeClip;
+
     public class PlaybackData
     {
         public string playerName;
@@ -47,6 +54,10 @@ public class CombatPlaybackUI : MonoBehaviour
     private bool enemyPanelUsesFrame;
     private Coroutine playbackRoutine;
     private Coroutine skipDelayRoutine;
+    private Coroutine shakeRoutine;
+    private Coroutine hitStopRoutine;
+    private Coroutine floatingTextRoutine;
+    private Coroutine floatingTextSecondaryRoutine;
     private Action onPlaybackComplete;
     private readonly List<Coroutine> parallelRoutines = new List<Coroutine>();
     private Color enemyPortraitDefaultColor = Color.clear;
@@ -63,25 +74,39 @@ public class CombatPlaybackUI : MonoBehaviour
     private TMP_Text floatingText;
     private TMP_Text floatingTextSecondary;
     private Button skipButton;
+    private Image critScreenFlashImage;
     private Image enemyPortraitImage;
     private Image enemyHpFill;
     private Image enemyMpFill;
+    private Image slashVfxImage;
+    private Image impactVfxImage;
     private CombatFighterPuppetUI playerPuppet;
     private CombatFighterPuppetUI enemyPuppet;
     private RectTransform playerFighterRect;
     private RectTransform enemyFighterRect;
+    private RectTransform playbackRootRect;
+    private RectTransform critScreenFlashRect;
     private RectTransform enemyHpFillRect;
     private RectTransform enemyMpFillRect;
+    private RectTransform slashVfxRect;
+    private RectTransform impactVfxRect;
     private RectTransform floatingTextRect;
     private RectTransform floatingTextSecondaryRect;
     private PlayerStats playbackPlayerStats;
+    private AudioSource slashAudioSource;
+    private AudioSource hitAudioSource;
+    private AudioSource critAudioSource;
+    private AudioSource blockAudioSource;
+    private AudioSource dodgeAudioSource;
 
     private int playerStartHp = 1;
     private int enemyStartHp = 1;
     private int currentPlayerHp = 1;
     private int currentEnemyHp = 1;
     private int originalPlayerStatsHp;
+    private float savedTimeScale = 1f;
     private bool hasOriginalPlayerStatsHp;
+    private bool hasActiveHitStop;
 
     private readonly Color panelColor = new Color(0.012f, 0.010f, 0.008f, 0.99f);
     private readonly Color stageColor = new Color(0.028f, 0.022f, 0.017f, 0.96f);
@@ -308,6 +333,8 @@ public class CombatPlaybackUI : MonoBehaviour
 
         if (skipButton != null)
             skipButton.gameObject.SetActive(false);
+
+        ClearTransientVisuals();
     }
 
     private string BuildFighterName(string fighterName, CombatStance stance)
@@ -526,6 +553,8 @@ public class CombatPlaybackUI : MonoBehaviour
 
         floatingText.text = textValue;
         floatingText.color = color;
+        floatingText.alpha = 1f;
+        floatingText.fontSize = textValue.Contains("CRIT") ? 44f : 38f;
 
         if (floatingTextRect == null)
             return;
@@ -534,6 +563,8 @@ public class CombatPlaybackUI : MonoBehaviour
         floatingTextRect.anchoredPosition = target == null
             ? new Vector2(0f, 150f)
             : GetFloatingTextPosition(floatingTextRect, target, targetIsPlayer, 0);
+
+        PlayFloatingTextMotion(floatingText, floatingTextRect, ref floatingTextRoutine);
 
         if (floatingTextSecondary != null)
             floatingTextSecondary.text = "";
@@ -562,11 +593,48 @@ public class CombatPlaybackUI : MonoBehaviour
 
         text.text = value;
         text.color = color;
+        text.alpha = 1f;
+        text.fontSize = value.Contains("CRIT") ? 44f : 38f;
 
         if (rect == null || target == null)
             return;
 
         rect.anchoredPosition = GetFloatingTextPosition(rect, target, targetIsPlayer, stackIndex);
+
+        if (text == floatingText)
+            PlayFloatingTextMotion(text, rect, ref floatingTextRoutine);
+        else if (text == floatingTextSecondary)
+            PlayFloatingTextMotion(text, rect, ref floatingTextSecondaryRoutine);
+    }
+
+    private void PlayFloatingTextMotion(TMP_Text text, RectTransform rect, ref Coroutine routine)
+    {
+        if (text == null || rect == null || string.IsNullOrEmpty(text.text))
+            return;
+
+        if (routine != null)
+            StopCoroutine(routine);
+
+        routine = StartCoroutine(AnimateFloatingText(text, rect));
+    }
+
+    private IEnumerator AnimateFloatingText(TMP_Text text, RectTransform rect)
+    {
+        Vector2 start = rect.anchoredPosition;
+        Vector2 end = start + new Vector2(0f, 34f);
+        float elapsed = 0f;
+        const float duration = 0.48f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            rect.anchoredPosition = Vector2.Lerp(start, end, EaseOutCubic(t));
+            text.alpha = Mathf.Lerp(1f, 0.35f, t);
+            yield return null;
+        }
+
+        rect.anchoredPosition = end;
     }
 
     private Vector2 GetFloatingTextPosition(RectTransform textRect, RectTransform target, bool targetIsPlayer, int stackIndex)
@@ -654,6 +722,8 @@ public class CombatPlaybackUI : MonoBehaviour
         if (attacker == null)
             yield break;
 
+        PlayAudioHook(slashAudioSource);
+        StartCoroutine(PlaySlashVfx(attackerIsPlayer));
         yield return attacker.PlayAttack();
     }
 
@@ -664,6 +734,8 @@ public class CombatPlaybackUI : MonoBehaviour
         if (target == null)
             yield break;
 
+        PlayAudioHook(blockAudioSource);
+        StartCameraShake(0.045f, 3f);
         yield return target.PlayBlock();
     }
 
@@ -674,6 +746,7 @@ public class CombatPlaybackUI : MonoBehaviour
         if (target == null)
             yield break;
 
+        PlayAudioHook(dodgeAudioSource);
         yield return target.PlayDodge();
     }
 
@@ -687,10 +760,191 @@ public class CombatPlaybackUI : MonoBehaviour
         if (!targetIsPlayer && enemyPortraitImage != null)
             enemyPortraitImage.color = isCrit ? titleColor : hitFlashColor;
 
+        PlayAudioHook(isCrit ? critAudioSource : hitAudioSource);
+        StartHitStop(isCrit ? 0.055f : 0.025f, isCrit ? 0.12f : 0.35f);
+        StartCameraShake(isCrit ? 0.14f : 0.075f, isCrit ? 13f : 7f);
+
+        if (isCrit)
+            StartCoroutine(PlayCritScreenFlash());
+
+        StartCoroutine(PlayImpactVfx(targetIsPlayer, isCrit));
         yield return target.PlayHit(isCrit);
 
         if (!targetIsPlayer && enemyPortraitImage != null)
             enemyPortraitImage.color = enemyPortraitDefaultColor;
+    }
+
+    private IEnumerator PlaySlashVfx(bool attackerIsPlayer)
+    {
+        if (slashVfxImage == null || slashVfxRect == null)
+            yield break;
+
+        RectTransform attackerRect = attackerIsPlayer ? playerFighterRect : enemyFighterRect;
+        if (attackerRect == null)
+            yield break;
+
+        Vector2 startPosition = GetStageLocalPoint(slashVfxRect, attackerRect, new Vector2(attackerIsPlayer ? 0.28f : -0.28f, 0.24f));
+        Vector2 endPosition = startPosition + new Vector2(attackerIsPlayer ? 95f : -95f, 20f);
+        float angle = attackerIsPlayer ? -18f : 18f;
+
+        slashVfxRect.sizeDelta = new Vector2(170f, 18f);
+        slashVfxRect.localEulerAngles = new Vector3(0f, 0f, angle);
+        slashVfxImage.color = new Color(1f, 0.86f, 0.34f, 0.78f);
+
+        float elapsed = 0f;
+        const float duration = 0.18f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            slashVfxRect.anchoredPosition = Vector2.Lerp(startPosition, endPosition, t);
+            slashVfxRect.sizeDelta = Vector2.Lerp(new Vector2(82f, 20f), new Vector2(230f, 42f), EaseOutCubic(t));
+            slashVfxImage.color = new Color(1f, 0.86f, 0.34f, Mathf.Lerp(0.82f, 0f, t));
+            yield return null;
+        }
+
+        slashVfxImage.color = Color.clear;
+        slashVfxRect.anchoredPosition = Vector2.zero;
+    }
+
+    private IEnumerator PlayImpactVfx(bool targetIsPlayer, bool isCrit)
+    {
+        if (impactVfxImage == null || impactVfxRect == null)
+            yield break;
+
+        RectTransform targetRect = targetIsPlayer ? playerFighterRect : enemyFighterRect;
+        if (targetRect == null)
+            yield break;
+
+        Vector2 impactPosition = GetStageLocalPoint(impactVfxRect, targetRect, new Vector2(targetIsPlayer ? 0.22f : -0.22f, 0.14f));
+        float startSize = isCrit ? 42f : 30f;
+        float endSize = isCrit ? 124f : 82f;
+        Color flashColor = isCrit
+            ? new Color(1f, 0.72f, 0.18f, 0.96f)
+            : new Color(1f, 0.22f, 0.12f, 0.82f);
+
+        impactVfxRect.anchoredPosition = impactPosition;
+        impactVfxRect.localEulerAngles = Vector3.zero;
+        impactVfxImage.color = flashColor;
+
+        float elapsed = 0f;
+        float duration = isCrit ? 0.20f : 0.14f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float size = Mathf.Lerp(startSize, endSize, EaseOutCubic(t));
+            impactVfxRect.sizeDelta = new Vector2(size, size);
+            impactVfxImage.color = new Color(flashColor.r, flashColor.g, flashColor.b, Mathf.Lerp(flashColor.a, 0f, t));
+            yield return null;
+        }
+
+        impactVfxImage.color = Color.clear;
+        impactVfxRect.sizeDelta = Vector2.one;
+    }
+
+    private IEnumerator PlayCritScreenFlash()
+    {
+        if (critScreenFlashImage == null)
+            yield break;
+
+        float elapsed = 0f;
+        const float duration = 0.18f;
+        Color flashColor = new Color(1f, 0.72f, 0.20f, 0.32f);
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            critScreenFlashImage.color = new Color(flashColor.r, flashColor.g, flashColor.b, Mathf.Lerp(flashColor.a, 0f, t));
+            yield return null;
+        }
+
+        critScreenFlashImage.color = Color.clear;
+    }
+
+    private void StartCameraShake(float duration, float strength)
+    {
+        if (playbackRootRect == null)
+            return;
+
+        if (shakeRoutine != null)
+            StopCoroutine(shakeRoutine);
+
+        shakeRoutine = StartCoroutine(PlayCameraShake(duration, strength));
+    }
+
+    private IEnumerator PlayCameraShake(float duration, float strength)
+    {
+        Vector2 start = Vector2.zero;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float fade = 1f - Mathf.Clamp01(elapsed / duration);
+            playbackRootRect.anchoredPosition = start + UnityEngine.Random.insideUnitCircle * strength * fade;
+            yield return null;
+        }
+
+        playbackRootRect.anchoredPosition = start;
+        shakeRoutine = null;
+    }
+
+    private void StartHitStop(float duration, float timeScale)
+    {
+        if (hitStopRoutine != null)
+            StopCoroutine(hitStopRoutine);
+
+        hitStopRoutine = StartCoroutine(PlayHitStop(duration, timeScale));
+    }
+
+    private IEnumerator PlayHitStop(float duration, float timeScale)
+    {
+        if (!hasActiveHitStop)
+        {
+            savedTimeScale = Time.timeScale;
+            hasActiveHitStop = true;
+        }
+
+        Time.timeScale = Mathf.Clamp(timeScale, 0.05f, 1f);
+        yield return new WaitForSecondsRealtime(duration);
+        RestoreTimeScale();
+        hitStopRoutine = null;
+    }
+
+    private void RestoreTimeScale()
+    {
+        if (!hasActiveHitStop)
+            return;
+
+        Time.timeScale = savedTimeScale;
+        hasActiveHitStop = false;
+    }
+
+    private void PlayAudioHook(AudioSource source)
+    {
+        if (source == null || source.clip == null)
+            return;
+
+        source.PlayOneShot(source.clip);
+    }
+
+    private Vector2 GetStageLocalPoint(RectTransform uiRect, RectTransform targetRect, Vector2 normalizedOffset)
+    {
+        RectTransform parentRect = uiRect != null ? uiRect.parent as RectTransform : null;
+
+        if (parentRect == null || targetRect == null)
+            return Vector2.zero;
+
+        Vector3 targetWorldPosition = targetRect.TransformPoint(new Vector3(
+            targetRect.rect.width * normalizedOffset.x,
+            targetRect.rect.height * normalizedOffset.y,
+            0f));
+
+        return parentRect.InverseTransformPoint(targetWorldPosition);
     }
 
     private IEnumerator AnimateDeathsIfNeeded(int playerHp, int enemyHp)
@@ -833,6 +1087,33 @@ public class CombatPlaybackUI : MonoBehaviour
             StopCoroutine(skipDelayRoutine);
             skipDelayRoutine = null;
         }
+
+        if (shakeRoutine != null)
+        {
+            StopCoroutine(shakeRoutine);
+            shakeRoutine = null;
+        }
+
+        if (hitStopRoutine != null)
+        {
+            StopCoroutine(hitStopRoutine);
+            hitStopRoutine = null;
+        }
+
+        if (floatingTextRoutine != null)
+        {
+            StopCoroutine(floatingTextRoutine);
+            floatingTextRoutine = null;
+        }
+
+        if (floatingTextSecondaryRoutine != null)
+        {
+            StopCoroutine(floatingTextSecondaryRoutine);
+            floatingTextSecondaryRoutine = null;
+        }
+
+        RestoreTimeScale();
+        ClearTransientVisuals();
     }
 
     private void BuildIfNeeded()
@@ -842,12 +1123,12 @@ public class CombatPlaybackUI : MonoBehaviour
 
         isBuilt = true;
 
-        RectTransform rootRect = GetComponent<RectTransform>();
-        rootRect.anchorMin = new Vector2(0.5f, 0.5f);
-        rootRect.anchorMax = new Vector2(0.5f, 0.5f);
-        rootRect.anchoredPosition = Vector2.zero;
-        rootRect.sizeDelta = new Vector2(1470f, 1080f);
-        rootRect.pivot = new Vector2(0.5f, 0.5f);
+        playbackRootRect = GetComponent<RectTransform>();
+        playbackRootRect.anchorMin = new Vector2(0.5f, 0.5f);
+        playbackRootRect.anchorMax = new Vector2(0.5f, 0.5f);
+        playbackRootRect.anchoredPosition = Vector2.zero;
+        playbackRootRect.sizeDelta = new Vector2(1470f, 1080f);
+        playbackRootRect.pivot = new Vector2(0.5f, 0.5f);
 
         Image background = gameObject.GetComponent<Image>();
         if (background == null)
@@ -865,6 +1146,7 @@ public class CombatPlaybackUI : MonoBehaviour
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = true;
 
+        BuildAudioHooks();
         BuildBattlefield();
         BuildEnemyPanel();
     }
@@ -896,6 +1178,7 @@ public class CombatPlaybackUI : MonoBehaviour
             CreateBattlefieldReadabilityOverlay(stage.transform);
 
         CreateStageFloor(stage.transform);
+        BuildCritScreenFlash(stage.transform);
 
         stageTitleText = CreateText("StageTitle", stage.transform, "ARENA DUEL", 40, FontStyles.Bold, TextAlignmentOptions.Center);
         stageTitleText.color = titleColor;
@@ -909,6 +1192,8 @@ public class CombatPlaybackUI : MonoBehaviour
 
         playerFighterRect = BuildStageFighter(stage.transform, "PlayerFighterRoot", true);
         enemyFighterRect = BuildStageFighter(stage.transform, "EnemyFighterRoot", false);
+
+        BuildCombatVfx(stage.transform);
 
         playerStageText = CreateText("PlayerStageName", stage.transform, "", 25, FontStyles.Bold, TextAlignmentOptions.Center);
         playerStageText.color = textColor;
@@ -936,7 +1221,7 @@ public class CombatPlaybackUI : MonoBehaviour
         GameObject fighter = CreateLayoutObject(objectName, parent);
 
         RectTransform rect = fighter.GetComponent<RectTransform>();
-        AnchorTo(rect, new Vector2(isPlayer ? 0.28f : 0.72f, 0.48f), new Vector2(isPlayer ? 0.28f : 0.72f, 0.48f), Vector2.zero, new Vector2(220f, 360f));
+        AnchorTo(rect, new Vector2(isPlayer ? 0.28f : 0.72f, 0.40f), new Vector2(isPlayer ? 0.28f : 0.72f, 0.40f), Vector2.zero, new Vector2(250f, 410f));
 
         CombatFighterPuppetUI puppet = fighter.AddComponent<CombatFighterPuppetUI>();
         Color bodyColor = isPlayer
@@ -960,6 +1245,138 @@ public class CombatPlaybackUI : MonoBehaviour
         return rect;
     }
 
+    private void BuildCombatVfx(Transform parent)
+    {
+        slashVfxImage = CreateVfxImage("SlashVfx", parent, out slashVfxRect);
+        impactVfxImage = CreateVfxImage("ImpactVfx", parent, out impactVfxRect);
+        slashVfxImage.sprite = CreateSoftSlashSprite();
+        impactVfxImage.sprite = CreateSoftCircleSprite();
+        slashVfxImage.type = Image.Type.Simple;
+        impactVfxImage.type = Image.Type.Simple;
+    }
+
+    private Image CreateVfxImage(string objectName, Transform parent, out RectTransform rect)
+    {
+        GameObject vfx = CreateLayoutObject(objectName, parent);
+        Image image = vfx.AddComponent<Image>();
+        image.color = Color.clear;
+        image.raycastTarget = false;
+
+        rect = vfx.GetComponent<RectTransform>();
+        AnchorTo(rect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1f, 1f));
+        return image;
+    }
+
+    private void BuildCritScreenFlash(Transform parent)
+    {
+        GameObject flash = CreateLayoutObject("CritScreenFlash", parent);
+        critScreenFlashImage = flash.AddComponent<Image>();
+        critScreenFlashImage.color = Color.clear;
+        critScreenFlashImage.raycastTarget = false;
+        critScreenFlashRect = flash.GetComponent<RectTransform>();
+        AnchorTo(critScreenFlashRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+    }
+
+    private void BuildAudioHooks()
+    {
+        slashAudioSource = CreateAudioHook("Audio_Slash", slashClip);
+        hitAudioSource = CreateAudioHook("Audio_Hit", hitClip);
+        critAudioSource = CreateAudioHook("Audio_Crit", critClip);
+        blockAudioSource = CreateAudioHook("Audio_Block", blockClip);
+        dodgeAudioSource = CreateAudioHook("Audio_Dodge", dodgeClip);
+    }
+
+    private AudioSource CreateAudioHook(string objectName, AudioClip clip)
+    {
+        GameObject hook = new GameObject(objectName, typeof(AudioSource));
+        hook.transform.SetParent(transform, false);
+
+        AudioSource source = hook.GetComponent<AudioSource>();
+        source.playOnAwake = false;
+        source.loop = false;
+        source.spatialBlend = 0f;
+        source.volume = 0.8f;
+        source.clip = clip;
+        return source;
+    }
+
+    private Sprite CreateSoftSlashSprite()
+    {
+        const int width = 128;
+        const int height = 32;
+        Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        Color[] pixels = new Color[width * height];
+        Vector2 center = new Vector2(width * 0.5f, height * 0.5f);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float normalizedX = Mathf.Abs((x - center.x) / (width * 0.5f));
+                float normalizedY = Mathf.Abs((y - center.y) / (height * 0.5f));
+                float alpha = Mathf.Clamp01(1f - normalizedX);
+                alpha *= Mathf.Clamp01(1f - normalizedY * normalizedY);
+                alpha = Mathf.Pow(alpha, 1.8f);
+                pixels[y * width + x] = new Color(1f, 0.78f, 0.18f, alpha);
+            }
+        }
+
+        texture.SetPixels(pixels);
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0f, 0f, width, height), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private Sprite CreateSoftCircleSprite()
+    {
+        const int size = 96;
+        Texture2D texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        Color[] pixels = new Color[size * size];
+        Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
+
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center) / (size * 0.5f);
+                float alpha = Mathf.Clamp01(1f - distance);
+                alpha = Mathf.Pow(alpha, 2.2f);
+                pixels[y * size + x] = new Color(1f, 0.24f, 0.12f, alpha);
+            }
+        }
+
+        texture.SetPixels(pixels);
+        texture.Apply();
+        return Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), 100f);
+    }
+
+    private void ClearTransientVisuals()
+    {
+        if (playbackRootRect != null)
+            playbackRootRect.anchoredPosition = Vector2.zero;
+
+        if (slashVfxImage != null)
+            slashVfxImage.color = Color.clear;
+
+        if (impactVfxImage != null)
+            impactVfxImage.color = Color.clear;
+
+        if (critScreenFlashImage != null)
+            critScreenFlashImage.color = Color.clear;
+    }
+
+    private float EaseOutCubic(float t)
+    {
+        t = Mathf.Clamp01(t);
+        float inverse = 1f - t;
+        return 1f - inverse * inverse * inverse;
+    }
+
     private void CreateStageFloor(Transform parent)
     {
         GameObject floor = CreateLayoutObject("StageFloor", parent);
@@ -974,7 +1391,7 @@ public class CombatPlaybackUI : MonoBehaviour
     {
         GameObject overlay = CreateLayoutObject("BattlefieldReadabilityOverlay", parent);
         Image overlayImage = overlay.AddComponent<Image>();
-        overlayImage.color = new Color(0.10f, 0.015f, 0.012f, 0.38f);
+        overlayImage.color = new Color(0.10f, 0.015f, 0.012f, 0.50f);
         AnchorTo(overlay.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
     }
 

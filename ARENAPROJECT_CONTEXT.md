@@ -57,6 +57,10 @@ The project currently compiles at the script level and the main gameplay loop is
 - the player fighter uses the imported knight pose sheet
 - the enemy fighter uses the imported orc pose sheet
 - `CombatFighterPuppetUI` keeps a hidden modular puppet hierarchy for future body-part sprites, but visible v1 playback uses pose states
+- Combat Playback now uses a daytime fantasy arena battlefield background with a dark readability overlay
+- Combat Playback fighters are scaled up and positioned lower so they stand closer to the arena floor
+- basic slash VFX plays on attacks
+- basic impact VFX plays on hits, with stronger impact VFX for crits
 - player can choose Arena combat stance in ArenaWindow before fighting
 - selected player stance is persisted in the local JSON save
 - Arena ResultPanel shows Victory, Defeat, or Draw
@@ -72,7 +76,8 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
-- Combat Playback v1 exists as a side-view Arena layout with pose-based fighter sprites and lightweight UI motion only
+- Combat Playback v1 exists as a side-view Arena layout with pose-based fighter sprites, a daytime arena battlefield background, lightweight UI motion, and first-pass slash/impact VFX
+- EnemyPanel uses a custom fantasy frame and orc portrait, but HP/MP alignment still needs later polish
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
 - shield blocking is supported in code but no shield item type/data exists yet
 - Arena enemies are generated from current player combat power, but are not saved yet
@@ -623,13 +628,17 @@ Combat Playback v1:
 - keeps the existing player `CharacterPanel` visible on the left side of the screen
 - transforms the right Arena area into a side-view battle layout
 - shows a central battlefield/stage between the left CharacterPanel area and the right EnemyPanel
+- the battlefield uses a daytime fantasy arena background image
+- a dark transparent overlay sits over the arena background to preserve fighter and floating-text readability
 - shows a mirrored `EnemyPanel` on the right side
-- EnemyPanel shows enemy portrait placeholder, enemy name, weapon slots, HP bar, and MP bar
+- EnemyPanel uses a custom fantasy frame and currently shows an orc portrait, enemy name, weapon slots, HP bar, and MP bar
 - EnemyPanel does not show EXP
+- EnemyPanel HP/MP alignment and bar polish are still known follow-up items
 - shows player and enemy pose-based fighters on the central battlefield facing each other
 - uses `CombatFighterPuppetUI` for visible pose states instead of rotating placeholder limbs
 - player fighter visuals are loaded from the knight pose sheet under `Resources/Combat/FighterPoses`
 - enemy fighter visuals are loaded from the orc pose sheet under `Resources/Combat/EnemyOrcPoses`
+- enemy portrait visuals currently use the imported orc portrait under `Resources/Combat/UI`
 - enemy fighter is mirrored/faced toward the player as needed by the playback layer
 - current visible pose states are:
   - Idle
@@ -663,6 +672,7 @@ Combat Playback v1:
 - `PoseRoot` is the visible layer for Combat Playback v1
 - `ModularPuppetRoot` is hidden for now and kept as future architecture only
 - visible pose presentation currently uses imported pose sprites, not rotating limb placeholders
+- fighter sprites are currently scaled up from the first pose-sprite pass and positioned lower so they sit closer to the arena floor
 - future pose sprites can replace the current knight/orc pose Images without changing combat calculation
 - real body-part sprites can later replace the hidden modular child Images if the project returns to full 2D puppet animation
 - fighter structure should continue evolving toward modular 2D puppet characters rather than single static PNG characters
@@ -688,6 +698,9 @@ Combat Playback v1:
 - temporarily updates visible player HP through `PlayerStats.currentHp` during playback so the left `CharacterPanel` HP bar decreases live
 - restores the original player HP value before ResultPanel/reward flow continues
 - uses simple UI movement for center-stage attacks
+- plays a short bright slash flash on attack
+- plays a small impact flash near the target on hit
+- crit impact VFX uses a stronger flash than normal hit impact
 - flashes the hit/dodging battlefield fighter, and flashes the enemy portrait when the enemy is hit
 - shows floating combat text near the fighter receiving the hit or action result, instead of overlapping in the battlefield center:
   - damage numbers
@@ -702,6 +715,16 @@ Combat Playback v1:
 - Skip does not recalculate combat and stops playback-only animation coroutines before ResultPanel opens
 - ResultPanel and Battle Log remain available after playback
 - current Combat Playback direction is focused on visual polish, VFX, readability, pacing, and eventual replacement with stronger authored combat art
+- current recommended next step for Combat Playback is Audio + hit feel polish
+- future Combat Playback polish items:
+  - camera shake
+  - hit stop
+  - slash sounds
+  - block clang
+  - dodge whoosh
+  - crit sound
+  - smoother HP animation
+  - enemy HUD alignment
 
 Combat stances:
 
@@ -829,18 +852,21 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Test pose-based Combat Playback v1 timing/readability on mobile aspect ratios
-2. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
-3. Add explicit New Game / Reset Progress debug UI
-4. Add save versioning / migration guard before save data grows further
-5. Test and tune generated Arena enemy balance against real saved characters
-6. Add Arena rank progression and token economy later
-7. Add Arena combat balance pass after testing real outcomes
+1. Add Audio + hit feel polish for Combat Playback
+2. Test pose-based Combat Playback timing/readability on mobile aspect ratios
+3. Polish enemy HUD alignment, especially HP/MP bar placement and mirrored frame spacing
+4. Add camera shake, hit stop, slash sounds, block clang, dodge whoosh, crit sound, and smoother HP animation
+5. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
+6. Add explicit New Game / Reset Progress debug UI
+7. Add save versioning / migration guard before save data grows further
+8. Test and tune generated Arena enemy balance against real saved characters
+9. Add Arena rank progression and token economy later
+10. Add Arena combat balance pass after testing real outcomes
 
 Good follow-up systems:
 
 - Arena token shop
 - item rewards / loot drops saved through `PlayerInventory.AddItem`
 - combat balance pass for dodge, block, crit, and damage formulas
-- improve Combat Playback with modular puppet parts, VFX, pacing controls, or replay support
+- improve Combat Playback with audio, hit feel, camera shake, modular puppet parts, VFX, pacing controls, or replay support
 - shield item type / shield equipment slot if the design needs shield blocking
