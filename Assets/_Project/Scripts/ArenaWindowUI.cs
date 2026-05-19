@@ -823,7 +823,8 @@ public class ArenaWindowUI : MonoBehaviour
             enemyStance = result.enemyStance,
             playerStartHp = result.playerStartHp,
             enemyStartHp = result.enemyStartHp,
-            events = result.playbackEvents
+            events = result.playbackEvents,
+            playerStats = playerStats
         };
 
         combatPlaybackUI.Play(playbackData, () => FinishFight(enemy, result));

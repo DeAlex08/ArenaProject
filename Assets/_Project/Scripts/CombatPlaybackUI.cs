@@ -19,6 +19,14 @@ public class CombatPlaybackUI : MonoBehaviour
         public int playerStartHp;
         public int enemyStartHp;
         public List<CombatSimulator.CombatPlaybackEvent> events;
+        public PlayerStats playerStats;
+    }
+
+    private class RoundPlaybackGroup
+    {
+        public CombatSimulator.CombatPlaybackEvent roundStart;
+        public readonly List<CombatSimulator.CombatPlaybackEvent> exchangeEvents = new List<CombatSimulator.CombatPlaybackEvent>();
+        public CombatSimulator.CombatPlaybackEvent roundEnd;
     }
 
     private bool isBuilt;
@@ -27,6 +35,7 @@ public class CombatPlaybackUI : MonoBehaviour
     private Coroutine playbackRoutine;
     private Coroutine skipDelayRoutine;
     private Action onPlaybackComplete;
+    private readonly List<Coroutine> parallelRoutines = new List<Coroutine>();
 
     private TMP_Text stageTitleText;
     private TMP_Text playerStageText;
@@ -36,6 +45,7 @@ public class CombatPlaybackUI : MonoBehaviour
     private TMP_Text enemyHpText;
     private TMP_Text enemyMpText;
     private TMP_Text floatingText;
+    private TMP_Text floatingTextSecondary;
     private Button skipButton;
     private Image enemyPortraitImage;
     private Image enemyHpFill;
@@ -45,11 +55,15 @@ public class CombatPlaybackUI : MonoBehaviour
     private RectTransform playerFighterRect;
     private RectTransform enemyFighterRect;
     private RectTransform floatingTextRect;
+    private RectTransform floatingTextSecondaryRect;
+    private PlayerStats playbackPlayerStats;
 
     private int playerStartHp = 1;
     private int enemyStartHp = 1;
     private int currentPlayerHp = 1;
     private int currentEnemyHp = 1;
+    private int originalPlayerStatsHp;
+    private bool hasOriginalPlayerStatsHp;
 
     private readonly Color panelColor = new Color(0.012f, 0.010f, 0.008f, 0.99f);
     private readonly Color stageColor = new Color(0.028f, 0.022f, 0.017f, 0.96f);
@@ -82,6 +96,7 @@ public class CombatPlaybackUI : MonoBehaviour
         }
 
         StopRunningCoroutines();
+        RestorePlaybackPlayerHp();
 
         onPlaybackComplete = completed;
         isFinishing = false;
@@ -96,6 +111,7 @@ public class CombatPlaybackUI : MonoBehaviour
     public void StopAndHide()
     {
         StopRunningCoroutines();
+        RestorePlaybackPlayerHp();
         canSkip = false;
         isFinishing = false;
         onPlaybackComplete = null;
@@ -117,6 +133,7 @@ public class CombatPlaybackUI : MonoBehaviour
     private IEnumerator PlayRoutine(PlaybackData playbackData)
     {
         List<CombatSimulator.CombatPlaybackEvent> events = playbackData.events ?? new List<CombatSimulator.CombatPlaybackEvent>();
+        List<RoundPlaybackGroup> rounds = BuildRoundGroups(events);
 
         if (events.Count == 0)
         {
@@ -125,17 +142,30 @@ public class CombatPlaybackUI : MonoBehaviour
             yield break;
         }
 
-        foreach (CombatSimulator.CombatPlaybackEvent playbackEvent in events)
+        if (rounds.Count == 0)
         {
-            if (isFinishing)
-                yield break;
-
-            yield return PlayEvent(playbackEvent);
-
-            if (playbackEvent.eventType == CombatSimulator.CombatPlaybackEventType.Hit ||
-                playbackEvent.eventType == CombatSimulator.CombatPlaybackEventType.Dodge)
+            foreach (CombatSimulator.CombatPlaybackEvent playbackEvent in events)
             {
-                SetSkipAvailable();
+                if (isFinishing)
+                    yield break;
+
+                yield return PlayEvent(playbackEvent);
+
+                if (playbackEvent.eventType == CombatSimulator.CombatPlaybackEventType.Hit ||
+                    playbackEvent.eventType == CombatSimulator.CombatPlaybackEventType.Dodge)
+                {
+                    SetSkipAvailable();
+                }
+            }
+        }
+        else
+        {
+            foreach (RoundPlaybackGroup round in rounds)
+            {
+                if (isFinishing)
+                    yield break;
+
+                yield return PlayRound(round);
             }
         }
 
@@ -188,6 +218,7 @@ public class CombatPlaybackUI : MonoBehaviour
 
         isFinishing = true;
         StopRunningCoroutines();
+        RestorePlaybackPlayerHp();
         gameObject.SetActive(false);
 
         Action completed = onPlaybackComplete;
@@ -218,6 +249,11 @@ public class CombatPlaybackUI : MonoBehaviour
         enemyStartHp = Mathf.Max(playbackData.enemyStartHp, 1);
         currentPlayerHp = playerStartHp;
         currentEnemyHp = enemyStartHp;
+        playbackPlayerStats = playbackData.playerStats;
+        hasOriginalPlayerStatsHp = playbackPlayerStats != null;
+
+        if (hasOriginalPlayerStatsHp)
+            originalPlayerStatsHp = playbackPlayerStats.currentHp;
 
         stageTitleText.text = "ARENA DUEL";
         playerStageText.text = BuildFighterName(playbackData.playerName, playbackData.playerStance);
@@ -225,6 +261,9 @@ public class CombatPlaybackUI : MonoBehaviour
         enemyNameText.text = playbackData.enemyName;
         floatingText.text = "FIGHT";
         floatingText.color = titleColor;
+
+        if (floatingTextSecondary != null)
+            floatingTextSecondary.text = "";
 
         Canvas.ForceUpdateCanvases();
         playerPuppet.ResetPose();
@@ -284,6 +323,174 @@ public class CombatPlaybackUI : MonoBehaviour
         return isPlayer ? playerFighterRect : enemyFighterRect;
     }
 
+    private List<RoundPlaybackGroup> BuildRoundGroups(List<CombatSimulator.CombatPlaybackEvent> events)
+    {
+        List<RoundPlaybackGroup> rounds = new List<RoundPlaybackGroup>();
+        RoundPlaybackGroup currentRound = null;
+
+        foreach (CombatSimulator.CombatPlaybackEvent playbackEvent in events)
+        {
+            if (playbackEvent == null)
+                continue;
+
+            switch (playbackEvent.eventType)
+            {
+                case CombatSimulator.CombatPlaybackEventType.RoundStart:
+                    if (currentRound != null)
+                        rounds.Add(currentRound);
+
+                    currentRound = new RoundPlaybackGroup { roundStart = playbackEvent };
+                    break;
+
+                case CombatSimulator.CombatPlaybackEventType.RoundEnd:
+                    if (currentRound == null)
+                        currentRound = new RoundPlaybackGroup();
+
+                    currentRound.roundEnd = playbackEvent;
+                    rounds.Add(currentRound);
+                    currentRound = null;
+                    break;
+
+                case CombatSimulator.CombatPlaybackEventType.Hit:
+                case CombatSimulator.CombatPlaybackEventType.Dodge:
+                    if (currentRound == null)
+                        currentRound = new RoundPlaybackGroup();
+
+                    currentRound.exchangeEvents.Add(playbackEvent);
+                    break;
+            }
+        }
+
+        if (currentRound != null)
+            rounds.Add(currentRound);
+
+        return rounds;
+    }
+
+    private IEnumerator PlayRound(RoundPlaybackGroup round)
+    {
+        if (round.roundStart != null)
+        {
+            ShowFloatingText(round.roundStart.message, titleColor, null);
+            yield return new WaitForSeconds(0.32f);
+        }
+
+        if (round.exchangeEvents.Count > 0)
+        {
+            yield return PlayRoundExchange(round.exchangeEvents);
+            SetSkipAvailable();
+        }
+
+        if (round.roundEnd != null)
+        {
+            yield return AnimateHpBars(round.roundEnd.playerHp, round.roundEnd.enemyHp, 0.20f);
+            yield return AnimateDeathsIfNeeded(round.roundEnd.playerHp, round.roundEnd.enemyHp);
+        }
+
+        yield return new WaitForSeconds(0.14f);
+    }
+
+    private IEnumerator PlayRoundExchange(List<CombatSimulator.CombatPlaybackEvent> exchangeEvents)
+    {
+        bool playerAttacks = HasSourceAction(exchangeEvents, true);
+        bool enemyAttacks = HasSourceAction(exchangeEvents, false);
+        bool playerDodges = HasTargetEvent(exchangeEvents, true, e => e.wasDodged);
+        bool enemyDodges = HasTargetEvent(exchangeEvents, false, e => e.wasDodged);
+        bool playerBlocks = HasTargetEvent(exchangeEvents, true, e => e.wasBlocked);
+        bool enemyBlocks = HasTargetEvent(exchangeEvents, false, e => e.wasBlocked);
+        bool playerHit = HasTargetEvent(exchangeEvents, true, e => e.eventType == CombatSimulator.CombatPlaybackEventType.Hit && !e.wasDodged);
+        bool enemyHit = HasTargetEvent(exchangeEvents, false, e => e.eventType == CombatSimulator.CombatPlaybackEventType.Hit && !e.wasDodged);
+        bool playerCrit = HasTargetEvent(exchangeEvents, true, e => e.wasCrit);
+        bool enemyCrit = HasTargetEvent(exchangeEvents, false, e => e.wasCrit);
+
+        List<IEnumerator> primaryActions = new List<IEnumerator>();
+        AddPrimaryRoundAction(primaryActions, true, playerAttacks, playerDodges, playerBlocks, playerHit, playerCrit);
+        AddPrimaryRoundAction(primaryActions, false, enemyAttacks, enemyDodges, enemyBlocks, enemyHit, enemyCrit);
+
+        if (primaryActions.Count > 0)
+            yield return RunParallel(primaryActions);
+
+        ShowRoundFloatingTexts(exchangeEvents);
+
+        List<IEnumerator> impactActions = new List<IEnumerator>();
+
+        if (playerHit && playerAttacks && !playerDodges && !playerBlocks)
+            impactActions.Add(AnimateHit(true, playerCrit));
+
+        if (enemyHit && enemyAttacks && !enemyDodges && !enemyBlocks)
+            impactActions.Add(AnimateHit(false, enemyCrit));
+
+        if (impactActions.Count > 0)
+            yield return RunParallel(impactActions);
+
+        yield return new WaitForSeconds(0.18f);
+    }
+
+    private void AddPrimaryRoundAction(
+        List<IEnumerator> actions,
+        bool isPlayer,
+        bool attacks,
+        bool dodges,
+        bool blocks,
+        bool hit,
+        bool crit)
+    {
+        if (dodges)
+        {
+            actions.Add(AnimateDodge(isPlayer));
+            return;
+        }
+
+        if (blocks)
+        {
+            actions.Add(AnimateBlock(isPlayer));
+            return;
+        }
+
+        if (attacks)
+        {
+            actions.Add(AnimateAttack(isPlayer));
+            return;
+        }
+
+        if (hit)
+            actions.Add(AnimateHit(isPlayer, crit));
+    }
+
+    private bool HasSourceAction(List<CombatSimulator.CombatPlaybackEvent> events, bool sourceIsPlayer)
+    {
+        return events.Exists(e => e != null && e.sourceIsPlayer == sourceIsPlayer);
+    }
+
+    private bool HasTargetEvent(
+        List<CombatSimulator.CombatPlaybackEvent> events,
+        bool targetIsPlayer,
+        Predicate<CombatSimulator.CombatPlaybackEvent> predicate)
+    {
+        return events.Exists(e => e != null && e.targetIsPlayer == targetIsPlayer && predicate(e));
+    }
+
+    private IEnumerator RunParallel(List<IEnumerator> routines)
+    {
+        int remaining = routines.Count;
+
+        foreach (IEnumerator routine in routines)
+            parallelRoutines.Add(StartCoroutine(RunAndComplete(routine, () => remaining--)));
+
+        while (remaining > 0)
+            yield return null;
+
+        parallelRoutines.Clear();
+    }
+
+    private IEnumerator RunAndComplete(IEnumerator routine, Action completed)
+    {
+        if (routine != null)
+            yield return routine;
+
+        completed?.Invoke();
+    }
+
     private void ShowFloatingText(string textValue, Color color, RectTransform target)
     {
         if (floatingText == null)
@@ -298,6 +505,61 @@ public class CombatPlaybackUI : MonoBehaviour
         floatingTextRect.anchoredPosition = target == null
             ? new Vector2(0f, 150f)
             : new Vector2(target.anchoredPosition.x, target.anchoredPosition.y + 185f);
+
+        if (floatingTextSecondary != null)
+            floatingTextSecondary.text = "";
+    }
+
+    private void ShowRoundFloatingTexts(List<CombatSimulator.CombatPlaybackEvent> exchangeEvents)
+    {
+        string playerText = BuildTargetFloatingText(exchangeEvents, true);
+        string enemyText = BuildTargetFloatingText(exchangeEvents, false);
+
+        SetFloatingText(floatingText, floatingTextRect, playerText, GetTargetFloatingTextColor(exchangeEvents, true), playerFighterRect);
+        SetFloatingText(floatingTextSecondary, floatingTextSecondaryRect, enemyText, GetTargetFloatingTextColor(exchangeEvents, false), enemyFighterRect);
+    }
+
+    private void SetFloatingText(TMP_Text text, RectTransform rect, string value, Color color, RectTransform target)
+    {
+        if (text == null)
+            return;
+
+        text.text = value;
+        text.color = color;
+
+        if (rect == null || target == null)
+            return;
+
+        rect.anchoredPosition = new Vector2(target.anchoredPosition.x, target.anchoredPosition.y + 185f);
+    }
+
+    private string BuildTargetFloatingText(List<CombatSimulator.CombatPlaybackEvent> events, bool targetIsPlayer)
+    {
+        List<string> parts = new List<string>();
+
+        foreach (CombatSimulator.CombatPlaybackEvent playbackEvent in events)
+        {
+            if (playbackEvent == null || playbackEvent.targetIsPlayer != targetIsPlayer)
+                continue;
+
+            parts.Add(BuildFloatingText(playbackEvent));
+        }
+
+        return parts.Count > 0 ? string.Join("\n", parts) : "";
+    }
+
+    private Color GetTargetFloatingTextColor(List<CombatSimulator.CombatPlaybackEvent> events, bool targetIsPlayer)
+    {
+        if (HasTargetEvent(events, targetIsPlayer, e => e.wasCrit))
+            return titleColor;
+
+        if (HasTargetEvent(events, targetIsPlayer, e => e.wasDodged))
+            return dodgeColor;
+
+        if (HasTargetEvent(events, targetIsPlayer, e => e.wasBlocked))
+            return blockColor;
+
+        return textColor;
     }
 
     private IEnumerator AnimateAttack(bool attackerIsPlayer)
@@ -403,6 +665,8 @@ public class CombatPlaybackUI : MonoBehaviour
         if (playerStageHpText != null)
             playerStageHpText.text = "HP " + currentPlayerHp + " / " + playerStartHp;
 
+        UpdatePlaybackPlayerHp(currentPlayerHp);
+
         float enemyFill = enemyStartHp > 0 ? (float)currentEnemyHp / enemyStartHp : 0f;
 
         if (enemyHpFill != null)
@@ -410,6 +674,28 @@ public class CombatPlaybackUI : MonoBehaviour
 
         if (enemyHpText != null)
             enemyHpText.text = currentEnemyHp + " / " + enemyStartHp;
+    }
+
+    private void UpdatePlaybackPlayerHp(int playerHp)
+    {
+        if (playbackPlayerStats == null)
+            return;
+
+        float hpPercent = playerStartHp > 0 ? Mathf.Clamp01((float)playerHp / playerStartHp) : 0f;
+        playbackPlayerStats.currentHp = Mathf.Clamp(
+            Mathf.RoundToInt(playbackPlayerStats.maxHp * hpPercent),
+            0,
+            playbackPlayerStats.maxHp);
+    }
+
+    private void RestorePlaybackPlayerHp()
+    {
+        if (!hasOriginalPlayerStatsHp || playbackPlayerStats == null)
+            return;
+
+        playbackPlayerStats.currentHp = originalPlayerStatsHp;
+        hasOriginalPlayerStatsHp = false;
+        playbackPlayerStats = null;
     }
 
     private void SetEnemyMpBar(float fillAmount)
@@ -423,6 +709,14 @@ public class CombatPlaybackUI : MonoBehaviour
 
     private void StopRunningCoroutines()
     {
+        foreach (Coroutine routine in parallelRoutines)
+        {
+            if (routine != null)
+                StopCoroutine(routine);
+        }
+
+        parallelRoutines.Clear();
+
         if (playbackRoutine != null)
         {
             StopCoroutine(playbackRoutine);
@@ -509,6 +803,10 @@ public class CombatPlaybackUI : MonoBehaviour
         floatingText = CreateText("FloatingText", stage.transform, "", 38, FontStyles.Bold, TextAlignmentOptions.Center);
         floatingTextRect = floatingText.rectTransform;
         AnchorTo(floatingTextRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(430f, 94f));
+
+        floatingTextSecondary = CreateText("FloatingTextSecondary", stage.transform, "", 38, FontStyles.Bold, TextAlignmentOptions.Center);
+        floatingTextSecondaryRect = floatingTextSecondary.rectTransform;
+        AnchorTo(floatingTextSecondaryRect, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(430f, 94f));
 
         CreateStageFloor(stage.transform);
     }
