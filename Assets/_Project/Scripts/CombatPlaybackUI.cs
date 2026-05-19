@@ -7,6 +7,9 @@ using UnityEngine.UI;
 
 public class CombatPlaybackUI : MonoBehaviour
 {
+    private const string PlayerPoseResourceRoot = "Combat/FighterPoses/";
+    private const string EnemyOrcPoseResourceRoot = "Combat/EnemyOrcPoses/";
+
     public class PlaybackData
     {
         public string playerName;
@@ -528,9 +531,8 @@ public class CombatPlaybackUI : MonoBehaviour
             ? new Color(0.48f, 0.40f, 0.30f, 1f)
             : new Color(0.56f, 0.28f, 0.17f, 1f);
 
-        // Placeholder puppet parts are intentionally separate UI Images.
-        // Real body-part sprites can later replace each child Image without changing playback orchestration.
-        puppet.Initialize(isPlayer, bodyColor, accentColor, bladeColor);
+        string poseResourceRoot = isPlayer ? PlayerPoseResourceRoot : EnemyOrcPoseResourceRoot;
+        puppet.Initialize(isPlayer, bodyColor, accentColor, bladeColor, poseResourceRoot);
 
         if (isPlayer)
             playerPuppet = puppet;

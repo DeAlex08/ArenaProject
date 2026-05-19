@@ -17,7 +17,7 @@ public enum CombatFighterPose
 
 public class CombatFighterPuppetUI : MonoBehaviour
 {
-    private const string PoseResourceRoot = "Combat/FighterPoses/";
+    private const string DefaultPoseResourceRoot = "Combat/FighterPoses/";
 
     [Header("Future Pose Sprites")]
     [SerializeField] private Sprite idleSprite;
@@ -39,6 +39,7 @@ public class CombatFighterPuppetUI : MonoBehaviour
     private bool facingRight = true;
     private bool nextAttackUsesRightPose = true;
     private bool isDead;
+    private string poseResourceRoot = DefaultPoseResourceRoot;
 
     private Color baseColor = new Color(0.10f, 0.095f, 0.085f, 1f);
     private Color limbColor = new Color(0.15f, 0.13f, 0.11f, 1f);
@@ -46,12 +47,13 @@ public class CombatFighterPuppetUI : MonoBehaviour
 
     public RectTransform RootRect => rootRect;
 
-    public void Initialize(bool faceRight, Color bodyColor, Color accentColor, Color bladeColor)
+    public void Initialize(bool faceRight, Color bodyColor, Color accentColor, Color bladeColor, string resourceRoot = DefaultPoseResourceRoot)
     {
         facingRight = faceRight;
         baseColor = bodyColor;
         limbColor = accentColor;
         weaponColor = bladeColor;
+        poseResourceRoot = NormalizeResourceRoot(resourceRoot);
 
         BuildIfNeeded();
         ResetPose();
@@ -427,7 +429,7 @@ public class CombatFighterPuppetUI : MonoBehaviour
 
     private Sprite LoadPoseSprite(string resourceName)
     {
-        string resourcePath = PoseResourceRoot + resourceName;
+        string resourcePath = poseResourceRoot + resourceName;
         Sprite importedSprite = Resources.Load<Sprite>(resourcePath);
 
         if (importedSprite != null)
@@ -448,5 +450,13 @@ public class CombatFighterPuppetUI : MonoBehaviour
             100f);
         sprite.name = resourceName;
         return sprite;
+    }
+
+    private string NormalizeResourceRoot(string resourceRoot)
+    {
+        if (string.IsNullOrEmpty(resourceRoot))
+            return DefaultPoseResourceRoot;
+
+        return resourceRoot.EndsWith("/") ? resourceRoot : resourceRoot + "/";
     }
 }
