@@ -821,6 +821,8 @@ public class ArenaWindowUI : MonoBehaviour
             enemyName = enemy.enemyName,
             playerStance = result.playerStance,
             enemyStance = result.enemyStance,
+            enemyLevel = enemy.level,
+            enemyCombatPower = enemy.combatPower,
             playerStartHp = result.playerStartHp,
             enemyStartHp = result.enemyStartHp,
             events = result.playbackEvents,

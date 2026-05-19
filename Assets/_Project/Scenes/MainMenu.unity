@@ -750,7 +750,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -8136371510512594515, guid: 863895487b3864ef598248c487fb98e6, type: 3}
+  m_Sprite: {fileID: -3456854028605094195, guid: 704a1512eaaf74256bd1b3602c472b79, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -1809,6 +1809,7 @@ MonoBehaviour:
   fallbackPlayerPower: 5567
   rank: Bronze III
   arenaTokens: 0
+  playerStance: 1
   enemies:
   - enemyName: Grave Duelist
     level: 9
@@ -1816,6 +1817,9 @@ MonoBehaviour:
     hp: 740
     attack: 110
     defense: 38
+    armor: 30
+    agility: 10
+    reaction: 10
     critChance: 7.5
     baseExpReward: 30
     tokenReward: 10
@@ -1827,6 +1831,9 @@ MonoBehaviour:
     hp: 1180
     attack: 165
     defense: 72
+    armor: 30
+    agility: 10
+    reaction: 10
     critChance: 9
     baseExpReward: 45
     tokenReward: 16
@@ -1838,6 +1845,9 @@ MonoBehaviour:
     hp: 1680
     attack: 240
     defense: 104
+    armor: 30
+    agility: 10
+    reaction: 10
     critChance: 13.5
     baseExpReward: 70
     tokenReward: 25

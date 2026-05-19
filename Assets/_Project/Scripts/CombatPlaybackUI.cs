@@ -9,6 +9,7 @@ public class CombatPlaybackUI : MonoBehaviour
 {
     private const string PlayerPoseResourceRoot = "Combat/FighterPoses/";
     private const string EnemyOrcPoseResourceRoot = "Combat/EnemyOrcPoses/";
+    private const string EnemyPanelFrameResourcePath = "Combat/UI/EnemyPanelFrame";
 
     public class PlaybackData
     {
@@ -16,6 +17,8 @@ public class CombatPlaybackUI : MonoBehaviour
         public string enemyName;
         public CombatStance playerStance;
         public CombatStance enemyStance;
+        public int enemyLevel;
+        public int enemyCombatPower;
         public int playerStartHp;
         public int enemyStartHp;
         public List<CombatSimulator.CombatPlaybackEvent> events;
@@ -32,6 +35,7 @@ public class CombatPlaybackUI : MonoBehaviour
     private bool isBuilt;
     private bool canSkip;
     private bool isFinishing;
+    private bool enemyPanelUsesFrame;
     private Coroutine playbackRoutine;
     private Coroutine skipDelayRoutine;
     private Action onPlaybackComplete;
@@ -42,6 +46,8 @@ public class CombatPlaybackUI : MonoBehaviour
     private TMP_Text enemyStageText;
     private TMP_Text playerStageHpText;
     private TMP_Text enemyNameText;
+    private TMP_Text enemyLevelText;
+    private TMP_Text enemyPowerText;
     private TMP_Text enemyHpText;
     private TMP_Text enemyMpText;
     private TMP_Text floatingText;
@@ -78,6 +84,7 @@ public class CombatPlaybackUI : MonoBehaviour
     private readonly Color hitFlashColor = new Color(0.65f, 0.12f, 0.08f, 1f);
     private readonly Color dodgeColor = new Color(0.55f, 0.70f, 0.95f, 1f);
     private readonly Color blockColor = new Color(0.62f, 0.72f, 0.76f, 1f);
+    private readonly Color hudTextColor = new Color(0.847f, 0.788f, 0.639f, 1f);
 
     private void Awake()
     {
@@ -259,6 +266,13 @@ public class CombatPlaybackUI : MonoBehaviour
         playerStageText.text = BuildFighterName(playbackData.playerName, playbackData.playerStance);
         enemyStageText.text = BuildFighterName(playbackData.enemyName, playbackData.enemyStance);
         enemyNameText.text = playbackData.enemyName;
+
+        if (enemyLevelText != null)
+            enemyLevelText.text = "LVL " + Mathf.Max(playbackData.enemyLevel, 1);
+
+        if (enemyPowerText != null)
+            enemyPowerText.text = Mathf.Max(playbackData.enemyCombatPower, 0).ToString("N0").Replace(",", " ");
+
         floatingText.text = "FIGHT";
         floatingText.color = titleColor;
 
@@ -912,8 +926,33 @@ public class CombatPlaybackUI : MonoBehaviour
     {
         GameObject panel = CreateLayoutObject("EnemyPanel", transform);
         Image panelImage = panel.AddComponent<Image>();
-        panelImage.color = cardColor;
-        AddOutline(panel, borderColor, new Vector2(2f, -2f));
+        Sprite enemyPanelFrame = Resources.Load<Sprite>(EnemyPanelFrameResourcePath);
+        enemyPanelUsesFrame = enemyPanelFrame != null;
+
+        if (enemyPanelUsesFrame)
+        {
+            panelImage.sprite = enemyPanelFrame;
+            panelImage.type = Image.Type.Simple;
+            panelImage.preserveAspect = false;
+            panelImage.color = Color.white;
+        }
+        else
+        {
+            panelImage.color = cardColor;
+            AddOutline(panel, borderColor, new Vector2(2f, -2f));
+            Debug.LogWarning("CombatPlaybackUI: EnemyPanel frame sprite not found at Resources/" + EnemyPanelFrameResourcePath);
+        }
+
+        LayoutElement element = panel.AddComponent<LayoutElement>();
+        element.minWidth = 360f;
+        element.preferredWidth = 380f;
+        element.flexibleWidth = 0f;
+
+        if (enemyPanelUsesFrame)
+        {
+            BuildFramedEnemyPanelContent(panel.transform);
+            return;
+        }
 
         VerticalLayoutGroup layout = panel.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(20, 20, 20, 22);
@@ -923,11 +962,6 @@ public class CombatPlaybackUI : MonoBehaviour
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
-
-        LayoutElement element = panel.AddComponent<LayoutElement>();
-        element.minWidth = 360f;
-        element.preferredWidth = 380f;
-        element.flexibleWidth = 0f;
 
         enemyNameText = CreateText("EnemyName", panel.transform, "", 30, FontStyles.Bold, TextAlignmentOptions.Center);
         enemyNameText.color = titleColor;
@@ -944,7 +978,49 @@ public class CombatPlaybackUI : MonoBehaviour
         BuildResourceBar(panel.transform, "MP", false);
     }
 
-    private void BuildWeaponSlots(Transform parent)
+    private void BuildFramedEnemyPanelContent(Transform parent)
+    {
+        enemyNameText = CreateEnemyHudText("EnemyName", parent, 24, FontStyles.Normal, TextAlignmentOptions.Left);
+        AnchorTo(enemyNameText.rectTransform, new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(27f, -14f), new Vector2(205f, 44f));
+        enemyNameText.rectTransform.pivot = new Vector2(0f, 1f);
+
+        enemyLevelText = CreateEnemyHudText("EnemyLevel", parent, 22, FontStyles.Bold, TextAlignmentOptions.Right);
+        AnchorTo(enemyLevelText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-27f, -14f), new Vector2(185f, 44f));
+        enemyLevelText.rectTransform.pivot = new Vector2(1f, 1f);
+
+        enemyPowerText = CreateEnemyHudText("EnemyPower", parent, 20, FontStyles.Bold, TextAlignmentOptions.Right);
+        AnchorTo(enemyPowerText.rectTransform, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-30f, -58f), new Vector2(180f, 42f));
+        enemyPowerText.rectTransform.pivot = new Vector2(1f, 1f);
+
+        GameObject portrait = CreatePanelBox("EnemyPortrait", parent, 0f);
+        AnchorTo(portrait.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -250f), new Vector2(340f, 465f));
+        enemyPortraitImage = portrait.GetComponent<Image>();
+
+        TMP_Text portraitMark = CreateText("Mark", portrait.transform, "ENEMY", 42, FontStyles.Bold, TextAlignmentOptions.Center);
+        portraitMark.color = new Color(0.42f, 0.31f, 0.20f, 0.72f);
+        AnchorTo(portraitMark.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+        GameObject slots = BuildWeaponSlots(parent);
+        AnchorTo(slots.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -604f), new Vector2(334f, 204f));
+
+        BuildFramedResourceBar(parent, "HP", true, -747f);
+        BuildFramedResourceBar(parent, "MP", false, -812f);
+    }
+
+    private TMP_Text CreateEnemyHudText(
+        string objectName,
+        Transform parent,
+        int fontSize,
+        FontStyles fontStyle,
+        TextAlignmentOptions alignment)
+    {
+        TMP_Text text = CreateText(objectName, parent, "", fontSize, fontStyle, alignment);
+        text.color = hudTextColor;
+        Destroy(text.GetComponent<LayoutElement>());
+        return text;
+    }
+
+    private GameObject BuildWeaponSlots(Transform parent)
     {
         GameObject slots = CreateLayoutObject("WeaponSlots", parent);
         HorizontalLayoutGroup layout = slots.AddComponent<HorizontalLayoutGroup>();
@@ -958,6 +1034,8 @@ public class CombatPlaybackUI : MonoBehaviour
 
         CreateWeaponSlot(slots.transform, "I");
         CreateWeaponSlot(slots.transform, "II");
+
+        return slots;
     }
 
     private void CreateWeaponSlot(Transform parent, string label)
@@ -990,8 +1068,12 @@ public class CombatPlaybackUI : MonoBehaviour
 
         GameObject bar = CreateLayoutObject(label + "Bar", row.transform);
         Image barBackground = bar.AddComponent<Image>();
-        barBackground.color = new Color(0.018f, 0.012f, 0.01f, 1f);
-        AddOutline(bar, darkBorderColor, new Vector2(2f, -2f));
+        barBackground.color = enemyPanelUsesFrame
+            ? Color.clear
+            : new Color(0.018f, 0.012f, 0.01f, 1f);
+
+        if (!enemyPanelUsesFrame)
+            AddOutline(bar, darkBorderColor, new Vector2(2f, -2f));
         LayoutElement barElement = bar.AddComponent<LayoutElement>();
         barElement.preferredWidth = 220f;
         barElement.flexibleWidth = 1f;
@@ -1029,12 +1111,55 @@ public class CombatPlaybackUI : MonoBehaviour
         }
     }
 
+    private void BuildFramedResourceBar(Transform parent, string label, bool isHp, float anchoredY)
+    {
+        GameObject bar = CreateLayoutObject(label + "Bar", parent);
+        Image barBackground = bar.AddComponent<Image>();
+        barBackground.color = Color.clear;
+        AnchorTo(bar.GetComponent<RectTransform>(), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(78f, anchoredY), new Vector2(260f, 30f));
+
+        GameObject fill = CreateLayoutObject("Fill", bar.transform);
+        Image fillImage = fill.AddComponent<Image>();
+        fillImage.color = isHp
+            ? new Color(0.68f, 0.04f, 0.03f, 1f)
+            : new Color(0.02f, 0.18f, 0.72f, 1f);
+        fillImage.type = Image.Type.Filled;
+        fillImage.fillMethod = Image.FillMethod.Horizontal;
+        fillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fillImage.fillAmount = 1f;
+
+        RectTransform fillRect = fill.GetComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = new Vector2(6f, 5f);
+        fillRect.offsetMax = new Vector2(-6f, -5f);
+
+        TMP_Text valueText = CreateText("Value", bar.transform, "", 19, FontStyles.Bold, TextAlignmentOptions.Right);
+        valueText.color = textColor;
+        valueText.margin = new Vector4(0f, 0f, 12f, 0f);
+        AnchorTo(valueText.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        Destroy(valueText.GetComponent<LayoutElement>());
+
+        if (isHp)
+        {
+            enemyHpFill = fillImage;
+            enemyHpText = valueText;
+        }
+        else
+        {
+            enemyMpFill = fillImage;
+            enemyMpText = valueText;
+        }
+    }
+
     private GameObject CreatePanelBox(string objectName, Transform parent, float preferredHeight)
     {
         GameObject box = CreateLayoutObject(objectName, parent);
         Image image = box.AddComponent<Image>();
-        image.color = portraitColor;
-        AddOutline(box, darkBorderColor, new Vector2(2f, -2f));
+        image.color = enemyPanelUsesFrame ? Color.clear : portraitColor;
+
+        if (!enemyPanelUsesFrame)
+            AddOutline(box, darkBorderColor, new Vector2(2f, -2f));
 
         LayoutElement element = box.AddComponent<LayoutElement>();
         element.minHeight = preferredHeight;
