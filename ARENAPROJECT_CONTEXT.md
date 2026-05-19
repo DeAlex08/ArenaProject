@@ -36,7 +36,7 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks and Arena.
 
-## Current Project State After Combat Playback v1
+## Current Project State After Combat Fighter Puppet v1
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -53,6 +53,8 @@ The project currently compiles at the script level and the main gameplay loop is
 - selecting Fight runs Combat Simulation v1 through `CombatSimulator`
 - after Fight, ArenaWindow opens `CombatPlaybackPanel` before showing ResultPanel
 - Combat Playback visually plays already-calculated combat events and does not recalculate the fight
+- Combat Playback v1 now uses pose-based fighter placeholders through `CombatFighterPuppetUI`
+- `CombatFighterPuppetUI` keeps a hidden modular puppet hierarchy for future body-part sprites, but visible v1 playback uses pose states
 - player can choose Arena combat stance in ArenaWindow before fighting
 - selected player stance is persisted in the local JSON save
 - Arena ResultPanel shows Victory, Defeat, or Draw
@@ -68,7 +70,7 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
-- Combat Playback v1 exists as a side-view Arena layout, but uses simple UI placeholder silhouettes and lightweight UI motion only
+- Combat Playback v1 exists as a side-view Arena layout with pose-based fighter placeholders and lightweight UI motion only
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
 - shield blocking is supported in code but no shield item type/data exists yet
 - Arena enemies are generated from current player combat power, but are not saved yet
@@ -622,11 +624,30 @@ Combat Playback v1:
 - shows a mirrored `EnemyPanel` on the right side
 - EnemyPanel shows enemy portrait placeholder, enemy name, weapon slots, HP bar, and MP bar
 - EnemyPanel does not show EXP
-- shows player and enemy fighter placeholders/models on the central battlefield facing each other
-- uses placeholder portrait/silhouette panels for now, structured so real sprites/models can be added later
-- current fighter placeholders are temporary only
-- future combat presentation should evolve toward modular 2D puppet fighters rather than single static PNG characters
-- future fighter puppet structure should support separate visual parts:
+- shows player and enemy pose-based fighter placeholders on the central battlefield facing each other
+- uses `CombatFighterPuppetUI` for visible pose states instead of rotating placeholder limbs
+- current visible pose states are:
+  - Idle
+  - AttackLeft
+  - AttackRight
+  - Block
+  - Dodge
+  - Hit
+  - CritHit
+  - Death
+- real pose sprites can later be assigned per state:
+  - idleSprite
+  - attackLeftSprite
+  - attackRightSprite
+  - blockSprite
+  - dodgeSprite
+  - hitSprite
+  - critHitSprite
+  - deathSprite
+- each runtime fighter root is built as:
+  - PlayerFighterRoot / EnemyFighterRoot
+  - PoseRoot
+  - ModularPuppetRoot
   - Body
   - Head
   - LeftArm
@@ -634,14 +655,28 @@ Combat Playback v1:
   - LeftWeapon
   - RightWeapon
   - Legs
-- future animation should be able to move body parts independently:
-  - attack
-  - block
-  - dodge
-  - counter
-  - hit
-  - crit
-  - death
+- `PoseRoot` is the visible layer for Combat Playback v1
+- `ModularPuppetRoot` is hidden for now and kept as future architecture only
+- visible pose placeholders are temporary UI `Image` placeholders only
+- real pose sprites can later replace the placeholder pose Images without changing combat calculation
+- real body-part sprites can later replace the hidden modular child Images if the project returns to full 2D puppet animation
+- fighter structure should continue evolving toward modular 2D puppet characters rather than single static PNG characters
+- fighter puppet structure supports separate visual parts:
+  - Body
+  - Head
+  - LeftArm
+  - RightArm
+  - LeftWeapon
+  - RightWeapon
+  - Legs
+- attack playback switches to AttackLeft/AttackRight pose and lunges FighterRoot toward the target
+- block playback switches to Block pose with a small guard pulse
+- dodge playback switches to Dodge pose and moves FighterRoot backward
+- hit playback switches to Hit pose and shakes/flashes the FighterRoot
+- crit playback switches to CritHit pose and uses a stronger flash/shake
+- death playback switches to Death pose at the end of the round if HP reaches 0
+- counter playback reuses the attack pose flow and is identified by `COUNTER` floating text
+- future animation may expand either toward authored pose sprites or full independent body/arm/weapon motion
 - shows player and enemy names plus stances near the battlefield fighters
 - plays events in sequence with short delays
 - animates enemy HP bar and lightweight battlefield HP text as damage happens
@@ -784,8 +819,8 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Add Combat Fighter Puppet v1
-2. Test Combat Playback v1 timing/readability on mobile aspect ratios
+1. Test pose-based Combat Playback v1 timing/readability on mobile aspect ratios
+2. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
 3. Add explicit New Game / Reset Progress debug UI
 4. Add save versioning / migration guard before save data grows further
 5. Test and tune generated Arena enemy balance against real saved characters

@@ -34,11 +34,11 @@ public class CombatPlaybackUI : MonoBehaviour
     private TMP_Text enemyMpText;
     private TMP_Text floatingText;
     private Button skipButton;
-    private Image playerStageImage;
-    private Image enemyStageImage;
     private Image enemyPortraitImage;
     private Image enemyHpFill;
     private Image enemyMpFill;
+    private CombatFighterPuppetUI playerPuppet;
+    private CombatFighterPuppetUI enemyPuppet;
     private RectTransform playerFighterRect;
     private RectTransform enemyFighterRect;
     private RectTransform floatingTextRect;
@@ -47,14 +47,11 @@ public class CombatPlaybackUI : MonoBehaviour
     private int enemyStartHp = 1;
     private int currentPlayerHp = 1;
     private int currentEnemyHp = 1;
-    private Vector2 playerStartPosition;
-    private Vector2 enemyStartPosition;
 
     private readonly Color panelColor = new Color(0.012f, 0.010f, 0.008f, 0.99f);
     private readonly Color stageColor = new Color(0.028f, 0.022f, 0.017f, 0.96f);
     private readonly Color cardColor = new Color(0.07f, 0.052f, 0.035f, 0.96f);
     private readonly Color portraitColor = new Color(0.035f, 0.032f, 0.030f, 1f);
-    private readonly Color silhouetteColor = new Color(0.10f, 0.095f, 0.085f, 1f);
     private readonly Color textColor = new Color(0.96f, 0.89f, 0.70f, 1f);
     private readonly Color titleColor = new Color(0.95f, 0.73f, 0.36f, 1f);
     private readonly Color mutedTextColor = new Color(0.70f, 0.63f, 0.50f, 1f);
@@ -157,21 +154,25 @@ public class CombatPlaybackUI : MonoBehaviour
 
             case CombatSimulator.CombatPlaybackEventType.RoundEnd:
                 yield return AnimateHpBars(playbackEvent.playerHp, playbackEvent.enemyHp, 0.16f);
+                yield return AnimateDeathsIfNeeded(playbackEvent.playerHp, playbackEvent.enemyHp);
                 yield return new WaitForSeconds(0.12f);
                 break;
 
             case CombatSimulator.CombatPlaybackEventType.Dodge:
                 yield return AnimateAttack(playbackEvent.sourceIsPlayer);
+                yield return AnimateDodge(playbackEvent.targetIsPlayer);
                 ShowFloatingText(BuildFloatingText(playbackEvent), dodgeColor, GetFighterRect(playbackEvent.targetIsPlayer));
-                yield return FlashFighter(playbackEvent.targetIsPlayer, dodgeColor, 0.16f);
                 yield return new WaitForSeconds(0.22f);
                 break;
 
             default:
                 yield return AnimateAttack(playbackEvent.sourceIsPlayer);
+                if (playbackEvent.wasBlocked)
+                    yield return AnimateBlock(playbackEvent.targetIsPlayer);
+
                 ShowFloatingText(BuildFloatingText(playbackEvent), GetFloatingTextColor(playbackEvent), GetFighterRect(playbackEvent.targetIsPlayer));
                 yield return AnimateHpBars(playbackEvent.playerHp, playbackEvent.enemyHp, 0.22f);
-                yield return FlashFighter(playbackEvent.targetIsPlayer, hitFlashColor, 0.16f);
+                yield return AnimateHit(playbackEvent.targetIsPlayer, playbackEvent.wasCrit);
                 yield return new WaitForSeconds(0.24f);
                 break;
         }
@@ -223,16 +224,16 @@ public class CombatPlaybackUI : MonoBehaviour
         floatingText.color = titleColor;
 
         Canvas.ForceUpdateCanvases();
-        playerStartPosition = playerFighterRect.anchoredPosition;
-        enemyStartPosition = enemyFighterRect.anchoredPosition;
+        playerPuppet.ResetPose();
+        enemyPuppet.ResetPose();
+        playerPuppet.CaptureCurrentPoseAsRest();
+        enemyPuppet.CaptureCurrentPoseAsRest();
 
         SetHpBars(currentPlayerHp, currentEnemyHp);
         SetEnemyMpBar(1f);
 
-        playerFighterRect.anchoredPosition = playerStartPosition;
-        enemyFighterRect.anchoredPosition = enemyStartPosition;
-        playerStageImage.color = silhouetteColor;
-        enemyStageImage.color = silhouetteColor;
+        playerPuppet.ResetPose();
+        enemyPuppet.ResetPose();
         enemyPortraitImage.color = portraitColor;
 
         if (skipButton != null)
@@ -298,32 +299,73 @@ public class CombatPlaybackUI : MonoBehaviour
 
     private IEnumerator AnimateAttack(bool attackerIsPlayer)
     {
-        RectTransform attacker = attackerIsPlayer ? playerFighterRect : enemyFighterRect;
-        Vector2 startPosition = attackerIsPlayer ? playerStartPosition : enemyStartPosition;
-        Vector2 attackPosition = startPosition + new Vector2(attackerIsPlayer ? 86f : -86f, 0f);
+        CombatFighterPuppetUI attacker = GetPuppet(attackerIsPlayer);
 
-        yield return MoveRect(attacker, startPosition, attackPosition, 0.10f);
-        yield return MoveRect(attacker, attackPosition, startPosition, 0.12f);
+        if (attacker == null)
+            yield break;
+
+        yield return attacker.PlayAttack();
     }
 
-    private IEnumerator FlashFighter(bool targetIsPlayer, Color flashColor, float duration)
+    private IEnumerator AnimateBlock(bool targetIsPlayer)
     {
-        Image target = targetIsPlayer ? playerStageImage : enemyStageImage;
+        CombatFighterPuppetUI target = GetPuppet(targetIsPlayer);
 
         if (target == null)
             yield break;
 
-        target.color = flashColor;
+        yield return target.PlayBlock();
+    }
+
+    private IEnumerator AnimateDodge(bool targetIsPlayer)
+    {
+        CombatFighterPuppetUI target = GetPuppet(targetIsPlayer);
+
+        if (target == null)
+            yield break;
+
+        yield return target.PlayDodge();
+    }
+
+    private IEnumerator AnimateHit(bool targetIsPlayer, bool isCrit)
+    {
+        CombatFighterPuppetUI target = GetPuppet(targetIsPlayer);
+
+        if (target == null)
+            yield break;
 
         if (!targetIsPlayer && enemyPortraitImage != null)
-            enemyPortraitImage.color = flashColor;
+            enemyPortraitImage.color = isCrit ? titleColor : hitFlashColor;
 
-        yield return new WaitForSeconds(duration);
-
-        target.color = silhouetteColor;
+        yield return target.PlayHit(isCrit);
 
         if (!targetIsPlayer && enemyPortraitImage != null)
             enemyPortraitImage.color = portraitColor;
+    }
+
+    private IEnumerator AnimateDeathsIfNeeded(int playerHp, int enemyHp)
+    {
+        bool playedDeath = false;
+
+        if (playerHp <= 0 && playerPuppet != null)
+        {
+            yield return playerPuppet.PlayDeath();
+            playedDeath = true;
+        }
+
+        if (enemyHp <= 0 && enemyPuppet != null)
+        {
+            yield return enemyPuppet.PlayDeath();
+            playedDeath = true;
+        }
+
+        if (playedDeath)
+            yield return new WaitForSeconds(0.15f);
+    }
+
+    private CombatFighterPuppetUI GetPuppet(bool isPlayer)
+    {
+        return isPlayer ? playerPuppet : enemyPuppet;
     }
 
     private IEnumerator AnimateHpBars(int targetPlayerHp, int targetEnemyHp, float duration)
@@ -348,24 +390,6 @@ public class CombatPlaybackUI : MonoBehaviour
         currentPlayerHp = targetPlayerHp;
         currentEnemyHp = targetEnemyHp;
         SetHpBars(currentPlayerHp, currentEnemyHp);
-    }
-
-    private IEnumerator MoveRect(RectTransform target, Vector2 from, Vector2 to, float duration)
-    {
-        if (target == null)
-            yield break;
-
-        float elapsed = 0f;
-
-        while (elapsed < duration)
-        {
-            elapsed += Time.deltaTime;
-            float t = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 1f;
-            target.anchoredPosition = Vector2.Lerp(from, to, t);
-            yield return null;
-        }
-
-        target.anchoredPosition = to;
     }
 
     private void SetHpBars(int playerHp, int enemyHp)
@@ -464,8 +488,8 @@ public class CombatPlaybackUI : MonoBehaviour
         AnchorTo(skipRect, new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-92f, -42f), new Vector2(150f, 56f));
         skipButton.gameObject.SetActive(false);
 
-        playerFighterRect = BuildStageFighter(stage.transform, "PlayerStageFighter", true);
-        enemyFighterRect = BuildStageFighter(stage.transform, "EnemyStageFighter", false);
+        playerFighterRect = BuildStageFighter(stage.transform, "PlayerFighterRoot", true);
+        enemyFighterRect = BuildStageFighter(stage.transform, "EnemyFighterRoot", false);
 
         playerStageText = CreateText("PlayerStageName", stage.transform, "", 25, FontStyles.Bold, TextAlignmentOptions.Center);
         playerStageText.color = textColor;
@@ -489,21 +513,29 @@ public class CombatPlaybackUI : MonoBehaviour
     private RectTransform BuildStageFighter(Transform parent, string objectName, bool isPlayer)
     {
         GameObject fighter = CreateLayoutObject(objectName, parent);
-        Image fighterImage = fighter.AddComponent<Image>();
-        fighterImage.color = silhouetteColor;
-        AddOutline(fighter, borderColor, new Vector2(2f, -2f));
 
         RectTransform rect = fighter.GetComponent<RectTransform>();
-        AnchorTo(rect, new Vector2(isPlayer ? 0.28f : 0.72f, 0.48f), new Vector2(isPlayer ? 0.28f : 0.72f, 0.48f), Vector2.zero, new Vector2(155f, 320f));
+        AnchorTo(rect, new Vector2(isPlayer ? 0.28f : 0.72f, 0.48f), new Vector2(isPlayer ? 0.28f : 0.72f, 0.48f), Vector2.zero, new Vector2(220f, 360f));
 
-        TMP_Text mark = CreateText("Mark", fighter.transform, isPlayer ? "PLAYER" : "ENEMY", 24, FontStyles.Bold, TextAlignmentOptions.Center);
-        mark.color = mutedTextColor;
-        AnchorTo(mark.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        CombatFighterPuppetUI puppet = fighter.AddComponent<CombatFighterPuppetUI>();
+        Color bodyColor = isPlayer
+            ? new Color(0.13f, 0.12f, 0.11f, 1f)
+            : new Color(0.16f, 0.09f, 0.075f, 1f);
+        Color accentColor = isPlayer
+            ? new Color(0.19f, 0.17f, 0.14f, 1f)
+            : new Color(0.24f, 0.12f, 0.10f, 1f);
+        Color bladeColor = isPlayer
+            ? new Color(0.48f, 0.40f, 0.30f, 1f)
+            : new Color(0.56f, 0.28f, 0.17f, 1f);
+
+        // Placeholder puppet parts are intentionally separate UI Images.
+        // Real body-part sprites can later replace each child Image without changing playback orchestration.
+        puppet.Initialize(isPlayer, bodyColor, accentColor, bladeColor);
 
         if (isPlayer)
-            playerStageImage = fighterImage;
+            playerPuppet = puppet;
         else
-            enemyStageImage = fighterImage;
+            enemyPuppet = puppet;
 
         return rect;
     }
