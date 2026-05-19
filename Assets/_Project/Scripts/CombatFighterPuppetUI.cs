@@ -17,6 +17,8 @@ public enum CombatFighterPose
 
 public class CombatFighterPuppetUI : MonoBehaviour
 {
+    private const string PoseResourceRoot = "Combat/FighterPoses/";
+
     [Header("Future Pose Sprites")]
     [SerializeField] private Sprite idleSprite;
     [SerializeField] private Sprite attackLeftSprite;
@@ -175,7 +177,6 @@ public class CombatFighterPuppetUI : MonoBehaviour
 
         isDead = true;
         SetPose(CombatFighterPose.Death);
-        SetPoseColor(new Color(0.20f, 0.17f, 0.15f, 1f));
         yield return MoveRoot(rootRect.anchoredPosition, rootStartPosition + new Vector2(0f, -22f), 0.16f);
     }
 
@@ -240,6 +241,7 @@ public class CombatFighterPuppetUI : MonoBehaviour
 
         BuildPoseRoot();
         BuildHiddenModularRoot();
+        LoadDefaultPoseSpritesIfNeeded();
         rootStartPosition = rootRect.anchoredPosition;
     }
 
@@ -252,7 +254,7 @@ public class CombatFighterPuppetUI : MonoBehaviour
         poseRootRect.anchorMax = new Vector2(0.5f, 0.5f);
         poseRootRect.pivot = new Vector2(0.5f, 0.5f);
         poseRootRect.anchoredPosition = Vector2.zero;
-        poseRootRect.sizeDelta = new Vector2(190f, 330f);
+        poseRootRect.sizeDelta = new Vector2(380f, 330f);
 
         GameObject imageObject = new GameObject("PoseImage", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         imageObject.transform.SetParent(poseRoot.transform, false);
@@ -264,6 +266,7 @@ public class CombatFighterPuppetUI : MonoBehaviour
 
         poseImage = imageObject.GetComponent<Image>();
         poseImage.preserveAspect = true;
+        poseImage.raycastTarget = false;
 
         Outline outline = imageObject.AddComponent<Outline>();
         outline.effectColor = new Color(0.04f, 0.025f, 0.015f, 1f);
@@ -405,5 +408,45 @@ public class CombatFighterPuppetUI : MonoBehaviour
     private float GetFacingDirection()
     {
         return facingRight ? 1f : -1f;
+    }
+
+    private void LoadDefaultPoseSpritesIfNeeded()
+    {
+        idleSprite = idleSprite != null ? idleSprite : LoadPoseSprite("FighterPose_Idle");
+        attackLeftSprite = attackLeftSprite != null ? attackLeftSprite : LoadPoseSprite("FighterPose_AttackLeft");
+        attackRightSprite = attackRightSprite != null ? attackRightSprite : LoadPoseSprite("FighterPose_AttackRight");
+        blockSprite = blockSprite != null ? blockSprite : LoadPoseSprite("FighterPose_Block");
+        dodgeSprite = dodgeSprite != null ? dodgeSprite : LoadPoseSprite("FighterPose_Dodge");
+        deathSprite = deathSprite != null ? deathSprite : LoadPoseSprite("FighterPose_Death");
+
+        // The first supplied sheet has no dedicated Hit/CritHit frames yet.
+        // Reusing Block keeps v1 sprite-based during hit reactions while flash/shake carries the impact.
+        hitSprite = hitSprite != null ? hitSprite : blockSprite;
+        critHitSprite = critHitSprite != null ? critHitSprite : blockSprite;
+    }
+
+    private Sprite LoadPoseSprite(string resourceName)
+    {
+        string resourcePath = PoseResourceRoot + resourceName;
+        Sprite importedSprite = Resources.Load<Sprite>(resourcePath);
+
+        if (importedSprite != null)
+            return importedSprite;
+
+        Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+
+        if (texture == null)
+        {
+            Debug.LogWarning("CombatFighterPuppetUI could not load pose asset: " + resourcePath);
+            return null;
+        }
+
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            100f);
+        sprite.name = resourceName;
+        return sprite;
     }
 }
