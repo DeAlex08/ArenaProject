@@ -26,6 +26,11 @@ public class CombatPlaybackUI : MonoBehaviour
     [SerializeField] private AudioClip critClip;
     [SerializeField] private AudioClip blockClip;
     [SerializeField] private AudioClip dodgeClip;
+    [SerializeField, Range(0f, 1f)] private float slashVolume = 0.42f;
+    [SerializeField, Range(0f, 1f)] private float hitVolume = 0.48f;
+    [SerializeField, Range(0f, 1f)] private float critVolume = 0.55f;
+    [SerializeField, Range(0f, 1f)] private float blockVolume = 0.44f;
+    [SerializeField, Range(0f, 1f)] private float dodgeVolume = 0.34f;
 
     public class PlaybackData
     {
@@ -98,6 +103,11 @@ public class CombatPlaybackUI : MonoBehaviour
     private AudioSource critAudioSource;
     private AudioSource blockAudioSource;
     private AudioSource dodgeAudioSource;
+    private float slashAudioVolume;
+    private float hitAudioVolume;
+    private float critAudioVolume;
+    private float blockAudioVolume;
+    private float dodgeAudioVolume;
 
     private int playerStartHp = 1;
     private int enemyStartHp = 1;
@@ -722,7 +732,7 @@ public class CombatPlaybackUI : MonoBehaviour
         if (attacker == null)
             yield break;
 
-        PlayAudioHook(slashAudioSource);
+        PlayAudioHook(slashAudioSource, slashAudioVolume);
         StartCoroutine(PlaySlashVfx(attackerIsPlayer));
         yield return attacker.PlayAttack();
     }
@@ -734,7 +744,7 @@ public class CombatPlaybackUI : MonoBehaviour
         if (target == null)
             yield break;
 
-        PlayAudioHook(blockAudioSource);
+        PlayAudioHook(blockAudioSource, blockAudioVolume);
         StartCameraShake(0.045f, 3f);
         yield return target.PlayBlock();
     }
@@ -746,7 +756,7 @@ public class CombatPlaybackUI : MonoBehaviour
         if (target == null)
             yield break;
 
-        PlayAudioHook(dodgeAudioSource);
+        PlayAudioHook(dodgeAudioSource, dodgeAudioVolume);
         yield return target.PlayDodge();
     }
 
@@ -760,7 +770,7 @@ public class CombatPlaybackUI : MonoBehaviour
         if (!targetIsPlayer && enemyPortraitImage != null)
             enemyPortraitImage.color = isCrit ? titleColor : hitFlashColor;
 
-        PlayAudioHook(isCrit ? critAudioSource : hitAudioSource);
+        PlayAudioHook(isCrit ? critAudioSource : hitAudioSource, isCrit ? critAudioVolume : hitAudioVolume);
         StartHitStop(isCrit ? 0.055f : 0.025f, isCrit ? 0.12f : 0.35f);
         StartCameraShake(isCrit ? 0.14f : 0.075f, isCrit ? 13f : 7f);
 
@@ -924,12 +934,12 @@ public class CombatPlaybackUI : MonoBehaviour
         hasActiveHitStop = false;
     }
 
-    private void PlayAudioHook(AudioSource source)
+    private void PlayAudioHook(AudioSource source, float volume)
     {
         if (source == null || source.clip == null)
             return;
 
-        source.PlayOneShot(source.clip);
+        source.PlayOneShot(source.clip, Mathf.Clamp01(volume));
     }
 
     private Vector2 GetStageLocalPoint(RectTransform uiRect, RectTransform targetRect, Vector2 normalizedOffset)
@@ -1112,6 +1122,7 @@ public class CombatPlaybackUI : MonoBehaviour
             floatingTextSecondaryRoutine = null;
         }
 
+        StopAudioHooks();
         RestoreTimeScale();
         ClearTransientVisuals();
     }
@@ -1279,14 +1290,20 @@ public class CombatPlaybackUI : MonoBehaviour
 
     private void BuildAudioHooks()
     {
-        slashAudioSource = CreateAudioHook("Audio_Slash", slashClip);
-        hitAudioSource = CreateAudioHook("Audio_Hit", hitClip);
-        critAudioSource = CreateAudioHook("Audio_Crit", critClip);
-        blockAudioSource = CreateAudioHook("Audio_Block", blockClip);
-        dodgeAudioSource = CreateAudioHook("Audio_Dodge", dodgeClip);
+        slashAudioVolume = slashVolume;
+        hitAudioVolume = hitVolume;
+        critAudioVolume = critVolume;
+        blockAudioVolume = blockVolume;
+        dodgeAudioVolume = dodgeVolume;
+
+        slashAudioSource = CreateAudioHook("Audio_Slash", slashClip != null ? slashClip : CreateSlashClip(), slashAudioVolume);
+        hitAudioSource = CreateAudioHook("Audio_Hit", hitClip != null ? hitClip : CreateHitClip(), hitAudioVolume);
+        critAudioSource = CreateAudioHook("Audio_Crit", critClip != null ? critClip : CreateCritClip(), critAudioVolume);
+        blockAudioSource = CreateAudioHook("Audio_Block", blockClip != null ? blockClip : CreateBlockClip(), blockAudioVolume);
+        dodgeAudioSource = CreateAudioHook("Audio_Dodge", dodgeClip != null ? dodgeClip : CreateDodgeClip(), dodgeAudioVolume);
     }
 
-    private AudioSource CreateAudioHook(string objectName, AudioClip clip)
+    private AudioSource CreateAudioHook(string objectName, AudioClip clip, float volume)
     {
         GameObject hook = new GameObject(objectName, typeof(AudioSource));
         hook.transform.SetParent(transform, false);
@@ -1295,9 +1312,109 @@ public class CombatPlaybackUI : MonoBehaviour
         source.playOnAwake = false;
         source.loop = false;
         source.spatialBlend = 0f;
-        source.volume = 0.8f;
+        source.volume = Mathf.Clamp01(volume);
         source.clip = clip;
         return source;
+    }
+
+    private void StopAudioHooks()
+    {
+        StopAudioHook(slashAudioSource);
+        StopAudioHook(hitAudioSource);
+        StopAudioHook(critAudioSource);
+        StopAudioHook(blockAudioSource);
+        StopAudioHook(dodgeAudioSource);
+    }
+
+    private void StopAudioHook(AudioSource source)
+    {
+        if (source != null)
+            source.Stop();
+    }
+
+    private AudioClip CreateSlashClip()
+    {
+        return CreateProceduralClip("Generated_SlashWhoosh", 0.18f, (time, duration) =>
+        {
+            float t = time / duration;
+            float envelope = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t));
+            float pitchSweep = Mathf.Lerp(920f, 240f, t);
+            float noise = PseudoNoise(time * 9200f);
+            return (Mathf.Sin(Mathf.PI * 2f * pitchSweep * time) * 0.22f + noise * 0.78f) * envelope * 0.45f;
+        });
+    }
+
+    private AudioClip CreateHitClip()
+    {
+        return CreateProceduralClip("Generated_HitThud", 0.16f, (time, duration) =>
+        {
+            float t = time / duration;
+            float envelope = Mathf.Exp(-t * 8f);
+            float low = Mathf.Sin(Mathf.PI * 2f * Mathf.Lerp(115f, 58f, t) * time);
+            float body = Mathf.Sin(Mathf.PI * 2f * 72f * time) * 0.45f;
+            return (low * 0.65f + body * 0.35f) * envelope * 0.65f;
+        });
+    }
+
+    private AudioClip CreateCritClip()
+    {
+        return CreateProceduralClip("Generated_CritImpact", 0.24f, (time, duration) =>
+        {
+            float t = time / duration;
+            float transient = t < 0.035f ? (1f - t / 0.035f) : 0f;
+            float envelope = Mathf.Exp(-t * 6f);
+            float low = Mathf.Sin(Mathf.PI * 2f * Mathf.Lerp(145f, 54f, t) * time) * envelope;
+            float sharp = Mathf.Sin(Mathf.PI * 2f * 1550f * time) * transient;
+            return (low * 0.72f + sharp * 0.34f + PseudoNoise(time * 13000f) * transient * 0.22f) * 0.72f;
+        });
+    }
+
+    private AudioClip CreateBlockClip()
+    {
+        return CreateProceduralClip("Generated_BlockClang", 0.28f, (time, duration) =>
+        {
+            float t = time / duration;
+            float envelope = Mathf.Exp(-t * 7f);
+            float clangA = Mathf.Sin(Mathf.PI * 2f * 820f * time);
+            float clangB = Mathf.Sin(Mathf.PI * 2f * 1280f * time + 0.8f);
+            float metal = Mathf.Sin(Mathf.PI * 2f * 2340f * time) * 0.2f;
+            return (clangA * 0.46f + clangB * 0.34f + metal) * envelope * 0.48f;
+        });
+    }
+
+    private AudioClip CreateDodgeClip()
+    {
+        return CreateProceduralClip("Generated_DodgeWhoosh", 0.14f, (time, duration) =>
+        {
+            float t = time / duration;
+            float envelope = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t));
+            float noise = PseudoNoise(time * 11500f);
+            float airy = Mathf.Sin(Mathf.PI * 2f * Mathf.Lerp(620f, 1180f, t) * time) * 0.18f;
+            return (noise * 0.72f + airy) * envelope * 0.32f;
+        });
+    }
+
+    private AudioClip CreateProceduralClip(string clipName, float duration, Func<float, float, float> sampleGenerator)
+    {
+        const int sampleRate = 44100;
+        int sampleCount = Mathf.Max(1, Mathf.CeilToInt(duration * sampleRate));
+        int samplePosition = 0;
+
+        return AudioClip.Create(clipName, sampleCount, 1, sampleRate, false, data =>
+        {
+            for (int i = 0; i < data.Length; i++)
+            {
+                int wrappedPosition = samplePosition % sampleCount;
+                float time = (float)wrappedPosition / sampleRate;
+                data[i] = Mathf.Clamp(sampleGenerator(time, duration), -1f, 1f);
+                samplePosition++;
+            }
+        });
+    }
+
+    private float PseudoNoise(float value)
+    {
+        return Mathf.Sin(value * 12.9898f + Mathf.Sin(value * 0.071f) * 78.233f);
     }
 
     private Sprite CreateSoftSlashSprite()
