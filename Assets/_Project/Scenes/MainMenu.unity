@@ -2729,7 +2729,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 426998552}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowGloves
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &426998552
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4241,7 +4253,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 659290276}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowAmulets
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &659290276
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4723,7 +4747,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 783697570}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowLegs
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &783697570
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5029,6 +5065,22 @@ MonoBehaviour:
     itemData: {fileID: 11400000, guid: a66db4ea24a874dbd9e0e683e2107125, type: 2}
   - instanceId: 
     itemData: {fileID: 11400000, guid: eef1f31de573c48508eb6067e6f6c118, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: 71eef112ca4e4a3ea832e212a0fce3b8, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: d715af9488554bc0b11d07d4af1bc8e0, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: 12272f6ebcaf47b3a36564c3a1f6de17, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: 42043bce107d4bc2822b5f832b30f788, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: 763576ae9d21427f8a5535ffe5029948, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: a703f2b9d0674adbae1cf2b794cf238a, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: 5c0ef27dfef94d3e850ece5093aef6a2, type: 2}
+  - instanceId: 
+    itemData: {fileID: 11400000, guid: b3ca38abfb3a4e99b3f8345a8f176cb7, type: 2}
 --- !u!1 &860383130
 GameObject:
   m_ObjectHideFlags: 0
@@ -5961,7 +6013,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1042330517}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowArmor
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1042330517
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6082,7 +6146,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1045118321}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowArtifacts
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1045118321
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10154,7 +10230,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1702337867}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowBelt
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1702337867
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13074,7 +13162,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1993451576}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowBoots
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1993451576
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13195,7 +13295,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1996171219}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 2007480608}
+        m_TargetAssemblyTypeName: BarracksInventoryUI, Assembly-CSharp
+        m_MethodName: ShowRings
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &1996171219
 MonoBehaviour:
   m_ObjectHideFlags: 0

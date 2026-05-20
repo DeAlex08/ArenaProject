@@ -701,6 +701,10 @@ Combat Playback v1:
 - plays a short bright slash flash on attack
 - plays a small impact flash near the target on hit
 - crit impact VFX uses a stronger flash than normal hit impact
+- slash and impact VFX placeholders are procedural soft UI sprites rather than hard rectangular flashes
+- normal hits trigger lightweight camera shake and a very short hit stop
+- critical hits trigger stronger camera shake, stronger hit stop, and a temporary crit screen flash
+- blocked hits trigger a small camera shake
 - flashes the hit/dodging battlefield fighter, and flashes the enemy portrait when the enemy is hit
 - shows floating combat text near the fighter receiving the hit or action result, instead of overlapping in the battlefield center:
   - damage numbers
@@ -709,20 +713,32 @@ Combat Playback v1:
   - CRIT
   - COUNTER
 - simultaneous player/enemy combat text uses separate target positions and small offsets so both read clearly
+- floating combat text now animates upward and fades; crit text is slightly larger
+- Combat Playback has audio hooks on `CombatPlaybackUI`:
+  - slash
+  - hit
+  - crit
+  - block
+  - dodge
+- if real audio clips are not assigned in the inspector, `CombatPlaybackUI` generates runtime placeholder SFX:
+  - `Generated_SlashWhoosh`
+  - `Generated_HitThud`
+  - `Generated_CritImpact`
+  - `Generated_BlockClang`
+  - `Generated_DodgeWhoosh`
+- generated SFX are temporary and should be replaced later with real authored slash, hit, crit, block, and dodge audio assets
 - has a `Skip` button
 - Skip appears after 2 seconds or after the first hit/dodge exchange
 - pressing Skip ends playback immediately and shows ResultPanel
-- Skip does not recalculate combat and stops playback-only animation coroutines before ResultPanel opens
+- Skip does not recalculate combat and stops playback-only animation/audio coroutines before ResultPanel opens
 - ResultPanel and Battle Log remain available after playback
 - current Combat Playback direction is focused on visual polish, VFX, readability, pacing, and eventual replacement with stronger authored combat art
-- current recommended next step for Combat Playback is Audio + hit feel polish
+- current recommended next step for Combat Playback is replacing procedural placeholder SFX with real audio assets and continuing hit-feel tuning
 - future Combat Playback polish items:
-  - camera shake
-  - hit stop
-  - slash sounds
-  - block clang
-  - dodge whoosh
-  - crit sound
+  - real slash sounds
+  - real block clang
+  - real dodge whoosh
+  - real crit sound
   - smoother HP animation
   - enemy HUD alignment
 
@@ -852,10 +868,10 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Add Audio + hit feel polish for Combat Playback
+1. Replace procedural Combat Playback placeholder SFX with real authored audio assets
 2. Test pose-based Combat Playback timing/readability on mobile aspect ratios
 3. Polish enemy HUD alignment, especially HP/MP bar placement and mirrored frame spacing
-4. Add camera shake, hit stop, slash sounds, block clang, dodge whoosh, crit sound, and smoother HP animation
+4. Tune hit feel further: camera shake intensity, hit stop duration, crit flash strength, and smoother HP animation
 5. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
 6. Add explicit New Game / Reset Progress debug UI
 7. Add save versioning / migration guard before save data grows further
