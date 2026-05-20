@@ -28,6 +28,7 @@ Current high-level UI structure:
 - `MainLocationPanel`
 - `BarracksWindow`
 - `ArenaWindow`
+- `MarketWindow`
 - `StatsWindow`
 - `InfoWindow`
 - `EquipWindow`
@@ -46,6 +47,9 @@ The project currently compiles at the script level and the main gameplay loop is
 - equipment bonuses are reapplied through `EquipmentManager.RefreshPlayerStats()`
 - CharacterPanel progression UI refreshes from `PlayerStats`
 - Barracks inventory/equipment UI continues to use existing item instances and equipment state
+- MarketWindow opens from the city hub and provides a first list-based Arena Token shop
+- MarketWindow sells test equipment items and adds purchases to `PlayerInventory`
+- purchased Market items persist through the existing inventory/equipment save-load flow
 - ArenaWindow opens from the city hub and shows three generated selectable enemies
 - Arena opponents are regenerated from current player combat power when ArenaWindow opens
 - Arena has a free `Refresh Opponents` button that regenerates the enemy list
@@ -76,6 +80,7 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
+- MarketWindow v1 is functional, but its UI is a simple list-based shop and not yet redesigned into a full Barracks-style buy/sell interface
 - Combat Playback v1 exists as a side-view Arena layout with pose-based fighter sprites, a daytime arena battlefield background, lightweight UI motion, and first-pass slash/impact VFX
 - EnemyPanel uses a custom fantasy frame and orc portrait, but HP/MP alignment still needs later polish
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
@@ -111,6 +116,8 @@ Responsibilities:
 - call `LocationNavigationController.OpenLocation(locationId)` on tap
 
 The current Barracks and Arena building touch areas use this flow.
+
+The current Market building touch area also uses this flow and opens `MarketWindow` directly.
 
 ### BarracksWindow
 
@@ -159,6 +166,51 @@ Important ArenaWindow responsibilities:
 - keep Continue behavior scoped to closing only ResultPanel
 - keep Battle Log behavior scoped to opening/closing only BattleLogPanel
 - do not apply stat/equipment/save logic directly outside existing `PlayerStats` and save flows
+
+### MarketWindow
+
+`MarketWindow` is the first shop/economy location window.
+
+Current Market v1 features:
+
+- lives inside the existing `MainMenu` scene
+- opens directly from the city hub Market building through `LocationNavigationController` / `BuildingButton`
+- inactive by default until opened
+- uses Arena Tokens as the purchase currency
+- shows current Arena Tokens
+- shows a simple list-based shop UI
+- offers current test equipment items:
+  - `Armor_Test`
+  - `Gloves_Test`
+  - `Belt_Test`
+  - `Legs_Test`
+  - `Boots_Test`
+  - `Ring_Test`
+  - `Amulet_Test`
+  - `Artifact_Test`
+- each shop card shows item name, item type, stats, token price, and a Buy button
+- purchases subtract Arena Tokens from `PlayerStats`
+- purchases add a new item instance through `PlayerInventory.AddItem`
+- purchases persist through the existing progression/inventory save-load flow
+- insufficient currency shows a simple MarketWindow message instead of opening another confirmation window
+
+Important Market v1 notes:
+
+- do not remove current Market v1 functionality while redesigning the UI
+- existing saved players can acquire the test equipment items through Market without resetting saves or injecting items into save data
+- current Market v1 does not implement selling yet
+- current Market v1 does not yet have category tabs or Barracks-style item card layout
+
+Intended Market v2 direction:
+
+- redesign Market by analogy with `BarracksWindow`
+- category buttons on the left
+- item cards on the right
+- Buy mode and Sell mode
+- Buy mode shows shop items by category
+- Sell mode shows player-owned items by category
+- selling returns 50% of item base/shop price
+- item cards should show icon, rarity, level requirement, stats, price, and Buy/Sell button
 
 ### CombatSimulator
 
@@ -345,6 +397,7 @@ Save triggers:
 - unequipping an item through `EquipmentManager`
 - inventory add/remove through `PlayerInventory`
 - selecting Arena combat stance through `ArenaWindowUI`
+- buying items in MarketWindow through `PlayerInventory.AddItem`
 
 Load flow:
 
@@ -392,6 +445,10 @@ Current completed or working systems:
 - modular city navigation
 - direct Barracks opening from city hub
 - direct Arena opening from city hub
+- direct Market opening from city hub
+- MarketWindow v1
+- Arena Token shop purchases
+- test equipment purchase flow through Market
 - ArenaWindow v1
 - generated Arena enemy cards
 - Arena enemy generation from player combat power
@@ -419,6 +476,7 @@ Current completed or working systems:
 - persistent available and allocated stat points
 - persistent inventory item instances
 - persistent equipped item slots
+- purchased Market items persist through existing inventory save data
 - stable item IDs for saved inventory
 - context menu reset for local progression save
 
@@ -868,20 +926,26 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Replace procedural Combat Playback placeholder SFX with real authored audio assets
-2. Test pose-based Combat Playback timing/readability on mobile aspect ratios
-3. Polish enemy HUD alignment, especially HP/MP bar placement and mirrored frame spacing
-4. Tune hit feel further: camera shake intensity, hit stop duration, crit flash strength, and smoother HP animation
-5. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
-6. Add explicit New Game / Reset Progress debug UI
-7. Add save versioning / migration guard before save data grows further
-8. Test and tune generated Arena enemy balance against real saved characters
-9. Add Arena rank progression and token economy later
-10. Add Arena combat balance pass after testing real outcomes
+1. Redesign Market by analogy with BarracksWindow: category buttons on the left and item cards on the right
+2. Add Market Buy mode and Sell mode
+3. In Buy mode, show shop items by category
+4. In Sell mode, show player-owned items by category
+5. Selling should return 50% of the item base/shop price
+6. Market item cards should show icon, rarity, level requirement, stats, price, and Buy/Sell button
+7. Replace procedural Combat Playback placeholder SFX with real authored audio assets
+8. Test pose-based Combat Playback timing/readability on mobile aspect ratios
+9. Polish enemy HUD alignment, especially HP/MP bar placement and mirrored frame spacing
+10. Tune hit feel further: camera shake intensity, hit stop duration, crit flash strength, and smoother HP animation
+11. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
+12. Add explicit New Game / Reset Progress debug UI
+13. Add save versioning / migration guard before save data grows further
+14. Test and tune generated Arena enemy balance against real saved characters
+15. Add Arena rank progression and token economy later
+16. Add Arena combat balance pass after testing real outcomes
 
 Good follow-up systems:
 
-- Arena token shop
+- Market v2 buy/sell economy
 - item rewards / loot drops saved through `PlayerInventory.AddItem`
 - combat balance pass for dodge, block, crit, and damage formulas
 - improve Combat Playback with audio, hit feel, camera shake, modular puppet parts, VFX, pacing controls, or replay support

@@ -98,8 +98,7 @@ public class MarketWindowUI : MonoBehaviour
         viewport.anchorMax = Vector2.one;
         viewport.offsetMin = new Vector2(18f, 18f);
         viewport.offsetMax = new Vector2(-18f, -18f);
-        Mask mask = viewport.gameObject.AddComponent<Mask>();
-        mask.showMaskGraphic = false;
+        viewport.gameObject.AddComponent<RectMask2D>();
         scrollRect.viewport = viewport;
 
         content = CreatePanel("Content", viewport, Vector2.zero, Vector2.zero, new Color(0f, 0f, 0f, 0f));
@@ -122,19 +121,43 @@ public class MarketWindowUI : MonoBehaviour
         ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+        int createdCards = 0;
+
         foreach (ShopEntry entry in shopEntries)
         {
             if (entry != null && entry.itemData != null)
+            {
                 CreateShopCard(entry);
+                createdCards++;
+            }
         }
 
+        if (createdCards == 0)
+        {
+            CreateText(
+                "EmptyShopMessage",
+                content,
+                "No market items configured",
+                new Vector2(0f, -40f),
+                new Vector2(800f, 60f),
+                26,
+                WarningColor,
+                TextAlignmentOptions.Center);
+
+            Debug.LogWarning("MarketWindowUI: No shop cards were created. Check shop entries and ItemDatabase.");
+        }
+
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(content);
         isBuilt = true;
     }
 
     private void CreateShopCard(ShopEntry entry)
     {
-        RectTransform card = CreatePanel("ShopCard_" + ItemDatabase.GetStableItemId(entry.itemData), content, Vector2.zero, new Vector2(0f, 148f), CardColor);
+        RectTransform card = CreatePanel("ShopCard_" + ItemDatabase.GetStableItemId(entry.itemData), content, Vector2.zero, new Vector2(1160f, 148f), CardColor);
         LayoutElement layoutElement = card.gameObject.AddComponent<LayoutElement>();
+        layoutElement.minWidth = 1120f;
+        layoutElement.preferredWidth = 1160f;
         layoutElement.minHeight = 148f;
         layoutElement.preferredHeight = 148f;
 

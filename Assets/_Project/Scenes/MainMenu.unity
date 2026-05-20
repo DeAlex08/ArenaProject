@@ -2093,7 +2093,23 @@ MonoBehaviour:
   playerInventory: {fileID: 814660972}
   itemDatabase: {fileID: 11400000, guid: 2a0c10982ab0c40689baa857c5b94618, type: 2}
   barracksInventoryUI: {fileID: 2007480608}
-  shopEntries: []
+  shopEntries:
+  - itemData: {fileID: 11400000, guid: 71eef112ca4e4a3ea832e212a0fce3b8, type: 2}
+    price: 30
+  - itemData: {fileID: 11400000, guid: d715af9488554bc0b11d07d4af1bc8e0, type: 2}
+    price: 20
+  - itemData: {fileID: 11400000, guid: 12272f6ebcaf47b3a36564c3a1f6de17, type: 2}
+    price: 20
+  - itemData: {fileID: 11400000, guid: 42043bce107d4bc2822b5f832b30f788, type: 2}
+    price: 25
+  - itemData: {fileID: 11400000, guid: 763576ae9d21427f8a5535ffe5029948, type: 2}
+    price: 20
+  - itemData: {fileID: 11400000, guid: a703f2b9d0674adbae1cf2b794cf238a, type: 2}
+    price: 35
+  - itemData: {fileID: 11400000, guid: 5c0ef27dfef94d3e850ece5093aef6a2, type: 2}
+    price: 40
+  - itemData: {fileID: 11400000, guid: b3ca38abfb3a4e99b3f8345a8f176cb7, type: 2}
+    price: 50
 --- !u!1 &310000010
 GameObject:
   m_ObjectHideFlags: 0
@@ -2130,8 +2146,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 165, y: 105}
-  m_SizeDelta: {x: 210, y: 76}
+  m_AnchoredPosition: {x: 10.7767, y: 110.23}
+  m_SizeDelta: {x: 187.553, y: 58.287}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &310000012
 MonoBehaviour:
