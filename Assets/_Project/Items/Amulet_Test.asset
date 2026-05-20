@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: Test Amulet
   itemType: 8
   rarity: 2
-  icon: {fileID: -3213545991579833927, guid: 0f35646daa51e4e4c987a2c20a3fd3f9, type: 3}
+  icon: {fileID: 7318211818263086454, guid: 8962ac650e5e943219e07fa818dfdd8a, type: 3}
   requiredLevel: 1
   minDamage: 0
   maxDamage: 0

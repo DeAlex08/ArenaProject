@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: Test Legs
   itemType: 5
   rarity: 1
-  icon: {fileID: -3995149267648586446, guid: 24fe4c56f309248539bff6c81725da46, type: 3}
+  icon: {fileID: 701852477551401415, guid: 370a12453410844afb1d35b0672cb54f, type: 3}
   requiredLevel: 1
   minDamage: 0
   maxDamage: 0

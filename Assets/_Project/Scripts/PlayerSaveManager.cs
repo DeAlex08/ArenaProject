@@ -24,6 +24,8 @@ public static class PlayerSaveManager
         public int allocatedLuck;
         public int allocatedIntelligence;
         public string selectedArenaStance = "Standard";
+        public int towerUnlockedFloor = 1;
+        public List<int> towerClearedFloors = new List<int>();
         public List<SavedInventoryItem> inventoryItems = new List<SavedInventoryItem>();
         public SavedEquipment equipment = new SavedEquipment();
     }
@@ -141,6 +143,39 @@ public static class PlayerSaveManager
         WriteSaveData(saveData);
     }
 
+    public static int LoadTowerUnlockedFloor(int fallbackFloor)
+    {
+        if (!TryLoad(out PlayerProgressionSaveData saveData))
+            return Mathf.Max(fallbackFloor, 1);
+
+        return Mathf.Max(saveData.towerUnlockedFloor, 1);
+    }
+
+    public static List<int> LoadTowerClearedFloors()
+    {
+        if (!TryLoad(out PlayerProgressionSaveData saveData))
+            return new List<int>();
+
+        if (saveData.towerClearedFloors == null)
+            return new List<int>();
+
+        return new List<int>(saveData.towerClearedFloors);
+    }
+
+    public static void SaveTowerProgress(int unlockedFloor, List<int> clearedFloors)
+    {
+        PlayerProgressionSaveData saveData = LoadOrCreateSaveData();
+        saveData.towerUnlockedFloor = Mathf.Max(unlockedFloor, 1);
+        saveData.towerClearedFloors = SanitizeTowerClearedFloors(clearedFloors);
+        WriteSaveData(saveData);
+
+        Debug.Log(
+            "PlayerSaveManager: Saved Tower progress. Unlocked floor: " +
+            saveData.towerUnlockedFloor +
+            ", cleared floors: " +
+            saveData.towerClearedFloors.Count);
+    }
+
     private static List<SavedInventoryItem> BuildInventorySave(PlayerInventory inventory)
     {
         List<SavedInventoryItem> savedItems = new List<SavedInventoryItem>();
@@ -170,6 +205,25 @@ public static class PlayerSaveManager
         return new PlayerProgressionSaveData();
     }
 
+    private static List<int> SanitizeTowerClearedFloors(List<int> clearedFloors)
+    {
+        List<int> sanitizedFloors = new List<int>();
+
+        if (clearedFloors == null)
+            return sanitizedFloors;
+
+        foreach (int floor in clearedFloors)
+        {
+            if (floor < 1 || sanitizedFloors.Contains(floor))
+                continue;
+
+            sanitizedFloors.Add(floor);
+        }
+
+        sanitizedFloors.Sort();
+        return sanitizedFloors;
+    }
+
     private static void EnsureSaveDefaults(PlayerProgressionSaveData saveData)
     {
         if (saveData == null)
@@ -183,6 +237,11 @@ public static class PlayerSaveManager
 
         if (string.IsNullOrEmpty(saveData.selectedArenaStance))
             saveData.selectedArenaStance = "Standard";
+
+        saveData.towerUnlockedFloor = Mathf.Max(saveData.towerUnlockedFloor, 1);
+
+        if (saveData.towerClearedFloors == null)
+            saveData.towerClearedFloors = new List<int>();
     }
 
     private static void WriteSaveData(PlayerProgressionSaveData saveData)

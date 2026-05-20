@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: Test Armor
   itemType: 2
   rarity: 1
-  icon: {fileID: -3995149267648586446, guid: 24fe4c56f309248539bff6c81725da46, type: 3}
+  icon: {fileID: -6298549602401680263, guid: a0a3a089829df41b88bb339ddf4fd88e, type: 3}
   requiredLevel: 1
   minDamage: 0
   maxDamage: 0

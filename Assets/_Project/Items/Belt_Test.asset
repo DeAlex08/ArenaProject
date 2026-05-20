@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: Test Belt
   itemType: 4
   rarity: 1
-  icon: {fileID: -7375882654009379127, guid: 55bc2c9a2fb5540bbbc316cdb8cc3ac6, type: 3}
+  icon: {fileID: 5838343063622585289, guid: 0bc57dccbbe1e43a19b8aecb6f589732, type: 3}
   requiredLevel: 1
   minDamage: 0
   maxDamage: 0

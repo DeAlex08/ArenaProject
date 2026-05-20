@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: Test Boots
   itemType: 6
   rarity: 1
-  icon: {fileID: -7375882654009379127, guid: 55bc2c9a2fb5540bbbc316cdb8cc3ac6, type: 3}
+  icon: {fileID: 701036280984408797, guid: 51c5271faff444c3c9754fa2b2071f63, type: 3}
   requiredLevel: 1
   minDamage: 0
   maxDamage: 0

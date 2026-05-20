@@ -6,11 +6,24 @@ using UnityEngine.UI;
 
 public class MarketWindowUI : MonoBehaviour
 {
+    private enum MarketMode
+    {
+        Buy,
+        Sell
+    }
+
     [Serializable]
     private class ShopEntry
     {
         public ItemData itemData;
         public int price;
+    }
+
+    private class CategoryButtonBinding
+    {
+        public ItemType itemType;
+        public Image background;
+        public TMP_Text label;
     }
 
     [Header("Navigation")]
@@ -21,22 +34,49 @@ public class MarketWindowUI : MonoBehaviour
     [SerializeField] private PlayerInventory playerInventory;
     [SerializeField] private ItemDatabase itemDatabase;
     [SerializeField] private BarracksInventoryUI barracksInventoryUI;
+    [SerializeField] private EquipmentManager equipmentManager;
 
     [Header("Shop")]
     [SerializeField] private List<ShopEntry> shopEntries = new List<ShopEntry>();
 
     private TMP_Text tokensText;
     private TMP_Text messageText;
+    private TMP_Text buyModeText;
+    private TMP_Text sellModeText;
+    private Image buyModeBackground;
+    private Image sellModeBackground;
     private RectTransform content;
-    private bool isPurchasing;
+    private readonly List<CategoryButtonBinding> categoryButtons = new List<CategoryButtonBinding>();
+
+    private MarketMode currentMode = MarketMode.Buy;
+    private ItemType currentCategory = ItemType.Armor;
+    private bool isProcessingTransaction;
     private bool isBuilt;
 
     private static readonly Color BackgroundColor = new Color(0.04f, 0.035f, 0.03f, 0.96f);
-    private static readonly Color PanelColor = new Color(0.12f, 0.105f, 0.08f, 0.92f);
-    private static readonly Color CardColor = new Color(0.19f, 0.17f, 0.13f, 0.95f);
+    private static readonly Color PanelColor = new Color(0.11f, 0.095f, 0.075f, 0.92f);
+    private static readonly Color CardColor = new Color(0.18f, 0.155f, 0.115f, 0.95f);
+    private static readonly Color ButtonColor = new Color(0.09f, 0.065f, 0.04f, 0.96f);
+    private static readonly Color SelectedColor = new Color(0.35f, 0.235f, 0.095f, 0.98f);
+    private static readonly Color DisabledColor = new Color(0.12f, 0.12f, 0.12f, 0.85f);
     private static readonly Color GoldColor = new Color(0.9f, 0.69f, 0.36f, 1f);
     private static readonly Color TextColor = new Color(0.88f, 0.82f, 0.68f, 1f);
+    private static readonly Color MutedTextColor = new Color(0.62f, 0.57f, 0.48f, 1f);
     private static readonly Color WarningColor = new Color(0.95f, 0.38f, 0.28f, 1f);
+
+    private readonly ItemType[] categoryOrder =
+    {
+        ItemType.Helmet,
+        ItemType.Weapon,
+        ItemType.Armor,
+        ItemType.Gloves,
+        ItemType.Belt,
+        ItemType.Legs,
+        ItemType.Boots,
+        ItemType.Ring,
+        ItemType.Amulet,
+        ItemType.Artifact
+    };
 
     private void Awake()
     {
@@ -48,10 +88,11 @@ public class MarketWindowUI : MonoBehaviour
     {
         ResolveReferences();
         EnsureDefaultShopEntries();
+
         if (!isBuilt)
             BuildWindow();
 
-        RefreshTokens();
+        RefreshAll();
     }
 
     public void Close()
@@ -64,7 +105,8 @@ public class MarketWindowUI : MonoBehaviour
 
     private void BuildWindow()
     {
-        ClearChildren();
+        ClearChildren(transform);
+        categoryButtons.Clear();
 
         Image background = GetComponent<Image>();
         if (background == null)
@@ -81,13 +123,71 @@ public class MarketWindowUI : MonoBehaviour
         root.sizeDelta = new Vector2(1470f, 1080f);
 
         CreateText("Title", root, "MARKET", new Vector2(0f, 470f), new Vector2(520f, 70f), 44, GoldColor, TextAlignmentOptions.Center);
-        tokensText = CreateText("ArenaTokensText", root, string.Empty, new Vector2(-510f, 395f), new Vector2(420f, 48f), 26, TextColor, TextAlignmentOptions.Left);
-        messageText = CreateText("MessageText", root, string.Empty, new Vector2(0f, 395f), new Vector2(600f, 48f), 24, WarningColor, TextAlignmentOptions.Center);
+        tokensText = CreateText("ArenaTokensText", root, string.Empty, new Vector2(-510f, 405f), new Vector2(420f, 48f), 26, TextColor, TextAlignmentOptions.Left);
+        messageText = CreateText("MessageText", root, string.Empty, new Vector2(70f, 405f), new Vector2(640f, 48f), 24, WarningColor, TextAlignmentOptions.Center);
 
         Button closeButton = CreateButton("CloseButton", root, "X", new Vector2(650f, 438f), new Vector2(84f, 64f), 32);
         closeButton.onClick.AddListener(Close);
 
-        RectTransform listPanel = CreatePanel("ShopListPanel", root, new Vector2(0f, -55f), new Vector2(1260f, 790f), PanelColor);
+        CreateModeToggle(root);
+        CreateCategoryPanel(root);
+        CreateItemsPanel(root);
+
+        isBuilt = true;
+    }
+
+    private void CreateModeToggle(RectTransform root)
+    {
+        Button buyButton = CreateButton("BuyModeButton", root, "BUY", new Vector2(-100f, 340f), new Vector2(190f, 62f), 26);
+        buyModeBackground = buyButton.targetGraphic as Image;
+        buyModeText = buyButton.GetComponentInChildren<TMP_Text>();
+        buyButton.onClick.AddListener(() => SelectMode(MarketMode.Buy));
+
+        Button sellButton = CreateButton("SellModeButton", root, "SELL", new Vector2(110f, 340f), new Vector2(190f, 62f), 26);
+        sellModeBackground = sellButton.targetGraphic as Image;
+        sellModeText = sellButton.GetComponentInChildren<TMP_Text>();
+        sellButton.onClick.AddListener(() => SelectMode(MarketMode.Sell));
+    }
+
+    private void CreateCategoryPanel(RectTransform root)
+    {
+        RectTransform panel = CreatePanel("CategoryPanel", root, new Vector2(-530f, -90f), new Vector2(260f, 760f), PanelColor);
+
+        VerticalLayoutGroup layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(12, 12, 16, 16);
+        layout.spacing = 10f;
+        layout.childAlignment = TextAnchor.UpperCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+
+        foreach (ItemType itemType in categoryOrder)
+            CreateCategoryButton(panel, itemType);
+    }
+
+    private void CreateCategoryButton(RectTransform parent, ItemType itemType)
+    {
+        Button button = CreateButton("CategoryButton_" + itemType, parent, GetCategoryLabel(itemType), Vector2.zero, new Vector2(220f, 58f), 20);
+        LayoutElement layoutElement = button.gameObject.AddComponent<LayoutElement>();
+        layoutElement.minHeight = 58f;
+        layoutElement.preferredHeight = 58f;
+
+        CategoryButtonBinding binding = new CategoryButtonBinding
+        {
+            itemType = itemType,
+            background = button.targetGraphic as Image,
+            label = button.GetComponentInChildren<TMP_Text>()
+        };
+
+        categoryButtons.Add(binding);
+        button.onClick.AddListener(() => SelectCategory(itemType));
+    }
+
+    private void CreateItemsPanel(RectTransform root)
+    {
+        RectTransform listPanel = CreatePanel("ItemsPanel", root, new Vector2(145f, -90f), new Vector2(1040f, 760f), PanelColor);
+
         ScrollRect scrollRect = listPanel.gameObject.AddComponent<ScrollRect>();
         scrollRect.horizontal = false;
         scrollRect.vertical = true;
@@ -110,8 +210,8 @@ public class MarketWindowUI : MonoBehaviour
         scrollRect.content = content;
 
         VerticalLayoutGroup layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
-        layout.padding = new RectOffset(12, 12, 12, 12);
-        layout.spacing = 14f;
+        layout.padding = new RectOffset(10, 10, 10, 10);
+        layout.spacing = 12f;
         layout.childAlignment = TextAnchor.UpperCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = false;
@@ -120,59 +220,179 @@ public class MarketWindowUI : MonoBehaviour
 
         ContentSizeFitter fitter = content.gameObject.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+    }
 
-        int createdCards = 0;
+    private void SelectMode(MarketMode mode)
+    {
+        if (currentMode == mode)
+            return;
 
-        foreach (ShopEntry entry in shopEntries)
-        {
-            if (entry != null && entry.itemData != null)
-            {
-                CreateShopCard(entry);
-                createdCards++;
-            }
-        }
+        currentMode = mode;
+        SetMessage(string.Empty);
+        RefreshAll();
+    }
+
+    private void SelectCategory(ItemType itemType)
+    {
+        if (currentCategory == itemType)
+            return;
+
+        currentCategory = itemType;
+        SetMessage(string.Empty);
+        RefreshAll();
+    }
+
+    private void RefreshAll()
+    {
+        RefreshTokens();
+        RefreshModeVisuals();
+        RefreshCategoryVisuals();
+        RefreshItemCards();
+    }
+
+    private void RefreshModeVisuals()
+    {
+        SetToggleVisual(buyModeBackground, buyModeText, currentMode == MarketMode.Buy);
+        SetToggleVisual(sellModeBackground, sellModeText, currentMode == MarketMode.Sell);
+    }
+
+    private void RefreshCategoryVisuals()
+    {
+        foreach (CategoryButtonBinding binding in categoryButtons)
+            SetToggleVisual(binding.background, binding.label, binding.itemType == currentCategory);
+    }
+
+    private void SetToggleVisual(Image background, TMP_Text label, bool selected)
+    {
+        if (background != null)
+            background.color = selected ? SelectedColor : ButtonColor;
+
+        if (label != null)
+            label.color = selected ? GoldColor : TextColor;
+    }
+
+    private void RefreshItemCards()
+    {
+        if (content == null)
+            return;
+
+        ClearChildren(content);
+
+        int createdCards = currentMode == MarketMode.Buy
+            ? CreateBuyCards()
+            : CreateSellCards();
 
         if (createdCards == 0)
-        {
-            CreateText(
-                "EmptyShopMessage",
-                content,
-                "No market items configured",
-                new Vector2(0f, -40f),
-                new Vector2(800f, 60f),
-                26,
-                WarningColor,
-                TextAlignmentOptions.Center);
-
-            Debug.LogWarning("MarketWindowUI: No shop cards were created. Check shop entries and ItemDatabase.");
-        }
+            CreateEmptyMessage("No items available");
 
         Canvas.ForceUpdateCanvases();
         LayoutRebuilder.ForceRebuildLayoutImmediate(content);
-        isBuilt = true;
     }
 
-    private void CreateShopCard(ShopEntry entry)
+    private int CreateBuyCards()
     {
-        RectTransform card = CreatePanel("ShopCard_" + ItemDatabase.GetStableItemId(entry.itemData), content, Vector2.zero, new Vector2(1160f, 148f), CardColor);
+        int count = 0;
+
+        foreach (ShopEntry entry in shopEntries)
+        {
+            if (entry == null || entry.itemData == null || entry.itemData.itemType != currentCategory)
+                continue;
+
+            CreateMarketCard(entry.itemData, GetShopPrice(entry.itemData), "BUY", true, () => BuyItem(entry));
+            count++;
+        }
+
+        return count;
+    }
+
+    private int CreateSellCards()
+    {
+        if (playerInventory == null)
+            return 0;
+
+        List<ItemInstance> items = playerInventory.GetItemsByType(currentCategory);
+        int count = 0;
+
+        foreach (ItemInstance itemInstance in items)
+        {
+            if (itemInstance == null || itemInstance.itemData == null)
+                continue;
+
+            bool isEquipped = IsEquipped(itemInstance);
+            string actionText = isEquipped ? "EQUIPPED" : "SELL";
+            int sellPrice = GetSellPrice(itemInstance.itemData);
+
+            CreateMarketCard(
+                itemInstance.itemData,
+                sellPrice,
+                actionText,
+                !isEquipped,
+                () => SellItem(itemInstance));
+
+            count++;
+        }
+
+        return count;
+    }
+
+    private void CreateEmptyMessage(string message)
+    {
+        TMP_Text label = CreateText("EmptyMessage", content, message, Vector2.zero, new Vector2(700f, 80f), 28, MutedTextColor, TextAlignmentOptions.Center);
+        LayoutElement layoutElement = label.gameObject.AddComponent<LayoutElement>();
+        layoutElement.minHeight = 90f;
+        layoutElement.preferredHeight = 90f;
+    }
+
+    private void CreateMarketCard(ItemData item, int price, string actionText, bool canClick, UnityEngine.Events.UnityAction action)
+    {
+        RectTransform card = CreatePanel("MarketCard_" + ItemDatabase.GetStableItemId(item), content, Vector2.zero, new Vector2(930f, 170f), CardColor);
         LayoutElement layoutElement = card.gameObject.AddComponent<LayoutElement>();
-        layoutElement.minWidth = 1120f;
-        layoutElement.preferredWidth = 1160f;
-        layoutElement.minHeight = 148f;
-        layoutElement.preferredHeight = 148f;
+        layoutElement.minWidth = 900f;
+        layoutElement.preferredWidth = 930f;
+        layoutElement.minHeight = 170f;
+        layoutElement.preferredHeight = 170f;
 
-        CreateText("ItemName", card, entry.itemData.itemName, new Vector2(-420f, 38f), new Vector2(330f, 44f), 26, GoldColor, TextAlignmentOptions.Left);
-        CreateText("ItemType", card, entry.itemData.itemType.ToString(), new Vector2(-420f, -8f), new Vector2(330f, 36f), 20, TextColor, TextAlignmentOptions.Left);
-        CreateText("Stats", card, BuildStatsText(entry.itemData), new Vector2(-40f, 10f), new Vector2(520f, 92f), 20, TextColor, TextAlignmentOptions.Left);
-        CreateText("Price", card, entry.price + " Tokens", new Vector2(420f, 32f), new Vector2(190f, 40f), 22, GoldColor, TextAlignmentOptions.Center);
+        CreateIcon(card, item.icon, new Vector2(-405f, 0f), new Vector2(112f, 112f));
+        CreateText("ItemName", card, item.itemName, new Vector2(-250f, 48f), new Vector2(330f, 38f), 24, GoldColor, TextAlignmentOptions.Left);
+        CreateText("Meta", card, GetRarityLabel(item.rarity) + "  LVL " + Mathf.Max(item.requiredLevel, 1), new Vector2(-250f, 10f), new Vector2(330f, 32f), 18, TextColor, TextAlignmentOptions.Left);
+        CreateText("Stats", card, BuildStatsText(item), new Vector2(80f, 8f), new Vector2(430f, 110f), 18, TextColor, TextAlignmentOptions.Left);
+        CreateText("Price", card, price + " Tokens", new Vector2(360f, 44f), new Vector2(160f, 34f), 20, GoldColor, TextAlignmentOptions.Center);
 
-        Button buyButton = CreateButton("BuyButton", card, "BUY", new Vector2(420f, -36f), new Vector2(190f, 58f), 24);
-        buyButton.onClick.AddListener(() => BuyItem(entry));
+        Button actionButton = CreateButton("ActionButton", card, actionText, new Vector2(360f, -34f), new Vector2(170f, 56f), 21);
+        actionButton.interactable = canClick;
+
+        Image buttonImage = actionButton.targetGraphic as Image;
+        if (!canClick && buttonImage != null)
+            buttonImage.color = DisabledColor;
+
+        if (canClick && action != null)
+            actionButton.onClick.AddListener(action);
+    }
+
+    private void CreateIcon(Transform parent, Sprite sprite, Vector2 anchoredPosition, Vector2 size)
+    {
+        RectTransform frame = CreatePanel("IconFrame", parent, anchoredPosition, size, new Color(0.055f, 0.05f, 0.045f, 0.96f));
+
+        GameObject iconObject = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        iconObject.layer = gameObject.layer;
+        iconObject.transform.SetParent(frame, false);
+
+        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.anchorMin = Vector2.zero;
+        iconRect.anchorMax = Vector2.one;
+        iconRect.offsetMin = new Vector2(8f, 8f);
+        iconRect.offsetMax = new Vector2(-8f, -8f);
+
+        Image icon = iconObject.GetComponent<Image>();
+        icon.sprite = sprite;
+        icon.preserveAspect = true;
+        icon.color = sprite != null ? Color.white : MutedTextColor;
+        icon.raycastTarget = false;
     }
 
     private void BuyItem(ShopEntry entry)
     {
-        if (isPurchasing)
+        if (isProcessingTransaction)
             return;
 
         if (entry == null || entry.itemData == null)
@@ -185,28 +405,92 @@ public class MarketWindowUI : MonoBehaviour
             return;
         }
 
-        if (playerStats.arenaTokens < entry.price)
+        int price = GetShopPrice(entry.itemData);
+
+        if (playerStats.arenaTokens < price)
         {
             SetMessage("Not enough Arena Tokens");
             Debug.Log("MarketWindowUI: Not enough Arena Tokens to buy " + entry.itemData.itemName);
             return;
         }
 
-        isPurchasing = true;
+        isProcessingTransaction = true;
 
-        playerStats.arenaTokens -= entry.price;
+        playerStats.arenaTokens -= price;
         playerStats.SaveProgression();
         playerInventory.AddItem(entry.itemData);
-
-        RefreshTokens();
 
         if (barracksInventoryUI != null)
             barracksInventoryUI.RefreshCurrentCategory();
 
         SetMessage("Purchased: " + entry.itemData.itemName);
-        Debug.Log("MarketWindowUI: Purchased " + entry.itemData.itemName + " for " + entry.price + " Arena Tokens.");
+        Debug.Log("MarketWindowUI: Purchased " + entry.itemData.itemName + " for " + price + " Arena Tokens.");
 
-        isPurchasing = false;
+        isProcessingTransaction = false;
+        RefreshAll();
+    }
+
+    private void SellItem(ItemInstance itemInstance)
+    {
+        if (isProcessingTransaction)
+            return;
+
+        if (itemInstance == null || itemInstance.itemData == null || playerStats == null || playerInventory == null)
+            return;
+
+        if (IsEquipped(itemInstance))
+        {
+            SetMessage("Unequip item before selling");
+            return;
+        }
+
+        int sellPrice = GetSellPrice(itemInstance.itemData);
+        isProcessingTransaction = true;
+
+        playerInventory.RemoveItem(itemInstance);
+        playerStats.arenaTokens += sellPrice;
+        playerStats.SaveProgression();
+        playerInventory.SaveInventoryAndEquipment();
+
+        if (barracksInventoryUI != null)
+            barracksInventoryUI.RefreshCurrentCategory();
+
+        SetMessage("Sold: " + itemInstance.itemData.itemName);
+        Debug.Log("MarketWindowUI: Sold " + itemInstance.itemData.itemName + " for " + sellPrice + " Arena Tokens.");
+
+        isProcessingTransaction = false;
+        RefreshAll();
+    }
+
+    private bool IsEquipped(ItemInstance itemInstance)
+    {
+        return equipmentManager != null && equipmentManager.IsItemEquipped(itemInstance);
+    }
+
+    private int GetShopPrice(ItemData item)
+    {
+        if (item == null)
+            return 0;
+
+        string itemId = ItemDatabase.GetStableItemId(item);
+
+        foreach (ShopEntry entry in shopEntries)
+        {
+            if (entry != null &&
+                entry.itemData != null &&
+                ItemDatabase.GetStableItemId(entry.itemData) == itemId &&
+                entry.price > 0)
+            {
+                return entry.price;
+            }
+        }
+
+        return item.price > 0 ? item.price : 10;
+    }
+
+    private int GetSellPrice(ItemData item)
+    {
+        return Mathf.FloorToInt(GetShopPrice(item) * 0.5f);
     }
 
     private void RefreshTokens()
@@ -225,6 +509,9 @@ public class MarketWindowUI : MonoBehaviour
     {
         List<string> parts = new List<string>();
 
+        if (item.minDamage > 0 || item.maxDamage > 0)
+            parts.Add("Damage " + item.minDamage + "-" + item.maxDamage);
+
         AddStat(parts, "Armor", item.armor);
         AddStat(parts, "Strength", item.strength);
         AddStat(parts, "Rage", item.rage);
@@ -234,9 +521,6 @@ public class MarketWindowUI : MonoBehaviour
         AddStat(parts, "Luck", item.luck);
         AddStat(parts, "Intelligence", item.intelligence);
 
-        if (item.minDamage > 0 || item.maxDamage > 0)
-            parts.Insert(0, "Damage " + item.minDamage + "-" + item.maxDamage);
-
         return parts.Count > 0 ? string.Join("  ", parts) : "No stat bonuses";
     }
 
@@ -244,6 +528,56 @@ public class MarketWindowUI : MonoBehaviour
     {
         if (value != 0)
             parts.Add(label + " +" + value);
+    }
+
+    private string GetRarityLabel(ItemRarity rarity)
+    {
+        switch (rarity)
+        {
+            case ItemRarity.Common:
+                return "Common";
+            case ItemRarity.Rare:
+                return "Rare";
+            case ItemRarity.Epic:
+                return "Epic";
+            case ItemRarity.Legendary:
+                return "Legendary";
+            case ItemRarity.Mythic:
+                return "Mythic";
+            case ItemRarity.Named:
+                return "Named";
+            default:
+                return rarity.ToString();
+        }
+    }
+
+    private string GetCategoryLabel(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Helmet:
+                return "Helmets";
+            case ItemType.Weapon:
+                return "Weapons";
+            case ItemType.Armor:
+                return "Armor";
+            case ItemType.Gloves:
+                return "Gloves";
+            case ItemType.Belt:
+                return "Belts";
+            case ItemType.Legs:
+                return "Legs";
+            case ItemType.Boots:
+                return "Boots";
+            case ItemType.Ring:
+                return "Rings";
+            case ItemType.Amulet:
+                return "Amulets";
+            case ItemType.Artifact:
+                return "Artifacts";
+            default:
+                return itemType.ToString();
+        }
     }
 
     private TMP_Text CreateText(string objectName, Transform parent, string text, Vector2 anchoredPosition, Vector2 size, int fontSize, Color color, TextAlignmentOptions alignment)
@@ -272,7 +606,7 @@ public class MarketWindowUI : MonoBehaviour
 
     private Button CreateButton(string objectName, Transform parent, string text, Vector2 anchoredPosition, Vector2 size, int fontSize)
     {
-        RectTransform buttonRect = CreatePanel(objectName, parent, anchoredPosition, size, new Color(0.08f, 0.055f, 0.035f, 0.96f));
+        RectTransform buttonRect = CreatePanel(objectName, parent, anchoredPosition, size, ButtonColor);
         Button button = buttonRect.gameObject.AddComponent<Button>();
         button.targetGraphic = buttonRect.GetComponent<Image>();
 
@@ -301,10 +635,10 @@ public class MarketWindowUI : MonoBehaviour
         return rectTransform;
     }
 
-    private void ClearChildren()
+    private void ClearChildren(Transform parent)
     {
-        for (int i = transform.childCount - 1; i >= 0; i--)
-            Destroy(transform.GetChild(i).gameObject);
+        for (int i = parent.childCount - 1; i >= 0; i--)
+            Destroy(parent.GetChild(i).gameObject);
     }
 
     private void ResolveReferences()
@@ -326,43 +660,61 @@ public class MarketWindowUI : MonoBehaviour
 
         if (barracksInventoryUI == null)
             barracksInventoryUI = FindSceneObject<BarracksInventoryUI>();
+
+        if (equipmentManager == null)
+            equipmentManager = FindSceneObject<EquipmentManager>();
     }
 
     private void EnsureDefaultShopEntries()
     {
-        if (shopEntries != null && shopEntries.Count > 0)
-            return;
-
-        shopEntries = new List<ShopEntry>
-        {
-            CreateShopEntry("Armor_Test", 30),
-            CreateShopEntry("Gloves_Test", 20),
-            CreateShopEntry("Belt_Test", 20),
-            CreateShopEntry("Legs_Test", 25),
-            CreateShopEntry("Boots_Test", 20),
-            CreateShopEntry("Ring_Test", 35),
-            CreateShopEntry("Amulet_Test", 40),
-            CreateShopEntry("Artifact_Test", 50)
-        };
-
+        AddMissingShopEntry("Helmet_Long", 1250);
+        AddMissingShopEntry("Helmet_Lord", 1650);
+        AddMissingShopEntry("Sword_Pain", 1650);
+        AddMissingShopEntry("Sword_Rage", 230);
+        AddMissingShopEntry("Armor_Test", 30);
+        AddMissingShopEntry("Gloves_Test", 20);
+        AddMissingShopEntry("Belt_Test", 20);
+        AddMissingShopEntry("Legs_Test", 25);
+        AddMissingShopEntry("Boots_Test", 20);
+        AddMissingShopEntry("Ring_Test", 35);
+        AddMissingShopEntry("Amulet_Test", 40);
+        AddMissingShopEntry("Artifact_Test", 50);
         shopEntries.RemoveAll(entry => entry == null || entry.itemData == null);
     }
 
-    private ShopEntry CreateShopEntry(string itemId, int price)
+    private void AddMissingShopEntry(string itemId, int fallbackPrice)
     {
+        if (ContainsShopItem(itemId))
+            return;
+
         ItemData itemData = itemDatabase != null ? itemDatabase.GetItemById(itemId) : null;
 
         if (itemData == null)
         {
             Debug.LogWarning("MarketWindowUI: Could not find shop item: " + itemId);
-            return null;
+            return;
         }
 
-        return new ShopEntry
+        shopEntries.Add(new ShopEntry
         {
             itemData = itemData,
-            price = price
-        };
+            price = fallbackPrice > 0 ? fallbackPrice : itemData.price
+        });
+    }
+
+    private bool ContainsShopItem(string itemId)
+    {
+        foreach (ShopEntry entry in shopEntries)
+        {
+            if (entry != null &&
+                entry.itemData != null &&
+                ItemDatabase.GetStableItemId(entry.itemData) == itemId)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private T FindSceneObject<T>() where T : UnityEngine.Object

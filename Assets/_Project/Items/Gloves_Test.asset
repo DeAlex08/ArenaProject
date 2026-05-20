@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: Test Gloves
   itemType: 3
   rarity: 1
-  icon: {fileID: -7375882654009379127, guid: 55bc2c9a2fb5540bbbc316cdb8cc3ac6, type: 3}
+  icon: {fileID: -3896627757111536427, guid: 7b741df22fa6c45c49525bbf9538672e, type: 3}
   requiredLevel: 1
   minDamage: 0
   maxDamage: 0

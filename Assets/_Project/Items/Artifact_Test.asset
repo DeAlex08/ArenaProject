@@ -16,7 +16,7 @@ MonoBehaviour:
   itemName: Test Artifact
   itemType: 9
   rarity: 3
-  icon: {fileID: -3213545991579833927, guid: 0f35646daa51e4e4c987a2c20a3fd3f9, type: 3}
+  icon: {fileID: -2988664123444592281, guid: fd3e9c5fbb4ff4291825a492e4387351, type: 3}
   requiredLevel: 1
   minDamage: 0
   maxDamage: 0
