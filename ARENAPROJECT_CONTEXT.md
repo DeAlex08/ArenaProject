@@ -29,15 +29,16 @@ Current high-level UI structure:
 - `BarracksWindow`
 - `ArenaWindow`
 - `MarketWindow`
+- `TrialTowerWindow`
 - `StatsWindow`
 - `InfoWindow`
 - `EquipWindow`
 
 `CharacterPanel` is the stable left-side player panel. It contains the portrait, resource bars, equipped weapon visuals, level/power text, and an integrated stats view.
 
-`MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks and Arena.
+`MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks, Arena, Market, and Tower of Trials.
 
-## Current Project State After Combat Playback Visual Improvements
+## Current Project State After Tower of Trials v1
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -47,8 +48,10 @@ The project currently compiles at the script level and the main gameplay loop is
 - equipment bonuses are reapplied through `EquipmentManager.RefreshPlayerStats()`
 - CharacterPanel progression UI refreshes from `PlayerStats`
 - Barracks inventory/equipment UI continues to use existing item instances and equipment state
-- MarketWindow opens from the city hub and provides a first list-based Arena Token shop
+- MarketWindow opens from the city hub and provides a category-based Arena Token shop
+- MarketWindow supports Buy and Sell modes
 - MarketWindow sells test equipment items and adds purchases to `PlayerInventory`
+- MarketWindow can sell unequipped player-owned items back for partial Arena Tokens
 - purchased Market items persist through the existing inventory/equipment save-load flow
 - ArenaWindow opens from the city hub and shows three generated selectable enemies
 - Arena opponents are regenerated from current player combat power when ArenaWindow opens
@@ -72,6 +75,20 @@ The project currently compiles at the script level and the main gameplay loop is
 - Battle Log opens inside ArenaWindow and shows the full round-by-round combat log
 - Arena rewards still apply EXP and Arena Tokens through `PlayerStats`
 - Arena rewards still save through the existing progression/save system
+- Tower of Trials v1 opens from the city hub Tower building through `TrialTowerWindow`
+- Tower of Trials is the first PvE progression system
+- Tower uses 10 floor cards with locked, available, and cleared states
+- clearing Tower floors unlocks the next floor and persists through the existing local JSON save
+- Tower fights reuse `CombatSimulator`, `CombatPlaybackUI`, ResultPanel-style flow, Battle Log, and the stable left `CharacterPanel`
+- Tower enemies scale by floor power/stats instead of current player power
+- Tower rewards EXP and Arena Tokens, with full first-clear rewards and reduced repeat-clear rewards
+
+Current live progression loop:
+
+- Arena -> earn Arena Tokens and EXP through generated PvP-style duels
+- Market -> spend Arena Tokens on gear upgrades or sell unequipped items
+- Barracks -> equip and compare gear, refresh player combat power
+- Tower of Trials -> push PvE floors for progression, EXP, and additional Arena Tokens
 
 Current known limitations:
 
@@ -80,7 +97,11 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
-- MarketWindow v1 is functional, but its UI is a simple list-based shop and not yet redesigned into a full Barracks-style buy/sell interface
+- MarketWindow v2 is functional, but still uses temporary shop data and needs visual polish against BarracksWindow
+- no loot drop system exists yet
+- no procedural item generation exists yet
+- Tower currently rewards only EXP and Arena Tokens
+- Tower presentation still needs stronger visual identity, boss floors, floor themes, and PvE-specific enemy art
 - Combat Playback v1 exists as a side-view Arena layout with pose-based fighter sprites, a daytime arena battlefield background, lightweight UI motion, and first-pass slash/impact VFX
 - EnemyPanel uses a custom fantasy frame and orc portrait, but HP/MP alignment still needs later polish
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
@@ -115,9 +136,7 @@ Responsibilities:
 - store optional display name
 - call `LocationNavigationController.OpenLocation(locationId)` on tap
 
-The current Barracks and Arena building touch areas use this flow.
-
-The current Market building touch area also uses this flow and opens `MarketWindow` directly.
+The current Barracks, Arena, Market, and Tower of Trials building touch areas use this flow.
 
 ### BarracksWindow
 
@@ -171,15 +190,30 @@ Important ArenaWindow responsibilities:
 
 `MarketWindow` is the first shop/economy location window.
 
-Current Market v1 features:
+Current Market v2 features:
 
 - lives inside the existing `MainMenu` scene
 - opens directly from the city hub Market building through `LocationNavigationController` / `BuildingButton`
 - inactive by default until opened
 - uses Arena Tokens as the purchase currency
 - shows current Arena Tokens
-- shows a simple list-based shop UI
-- offers current test equipment items:
+- uses a Barracks-inspired category layout
+- has Buy and Sell modes
+- has category buttons for:
+  - Helmets
+  - Weapons
+  - Armor
+  - Gloves
+  - Belts
+  - Legs
+  - Boots
+  - Rings
+  - Amulets
+  - Artifacts
+- Buy mode shows shop items filtered by selected category
+- Sell mode shows player-owned inventory items filtered by selected category
+- item cards show item name, type/category, rarity/level when available, stats, price, and the relevant Buy/Sell button
+- current shop offers test equipment items:
   - `Armor_Test`
   - `Gloves_Test`
   - `Belt_Test`
@@ -188,29 +222,76 @@ Current Market v1 features:
   - `Ring_Test`
   - `Amulet_Test`
   - `Artifact_Test`
-- each shop card shows item name, item type, stats, token price, and a Buy button
 - purchases subtract Arena Tokens from `PlayerStats`
 - purchases add a new item instance through `PlayerInventory.AddItem`
 - purchases persist through the existing progression/inventory save-load flow
+- selling removes the unequipped item from `PlayerInventory`
+- selling adds Arena Tokens back to `PlayerStats`
+- sell price is 50% of the configured shop/base price, rounded down
+- currently equipped items are protected from accidental sale
 - insufficient currency shows a simple MarketWindow message instead of opening another confirmation window
 
-Important Market v1 notes:
+Important Market notes:
 
-- do not remove current Market v1 functionality while redesigning the UI
 - existing saved players can acquire the test equipment items through Market without resetting saves or injecting items into save data
-- current Market v1 does not implement selling yet
-- current Market v1 does not yet have category tabs or Barracks-style item card layout
+- the current Market is functional and should not be removed while polishing visuals
+- future work should make Market cards visually closer to Barracks item cards
 
-Intended Market v2 direction:
+### TowerWindow
 
-- redesign Market by analogy with `BarracksWindow`
-- category buttons on the left
-- item cards on the right
-- Buy mode and Sell mode
-- Buy mode shows shop items by category
-- Sell mode shows player-owned items by category
-- selling returns 50% of item base/shop price
-- item cards should show icon, rarity, level requirement, stats, price, and Buy/Sell button
+`TrialTowerWindow` is the first PvE progression location.
+
+Current Tower of Trials v1 features:
+
+- lives inside the existing `MainMenu` scene
+- opens directly from the city hub Tower building through `LocationNavigationController` / `BuildingButton`
+- inactive by default until opened
+- visually follows the current dark fantasy UI direction
+- contains 10 floors
+- floor 1 is unlocked by default
+- each floor card shows:
+  - floor number
+  - enemy name
+  - portrait placeholder
+  - recommended level
+  - enemy combat power
+  - EXP reward preview
+  - Arena Token reward preview
+  - status: Locked, Available, or Cleared
+  - Enter button
+- current available floor is visually highlighted
+- locked floors are greyed out and cannot be entered
+- cleared floors remain marked after restart
+- clearing a floor unlocks the next floor
+- Tower progress is saved through `PlayerSaveManager`
+
+Tower combat architecture:
+
+- Tower does not create a second combat system
+- Tower reuses `CombatSimulator`
+- Tower reuses `CombatPlaybackUI`
+- Tower reuses the existing side-view combat playback architecture
+- Tower reuses the stable left-side `CharacterPanel`
+- Tower uses a ResultPanel-style result flow and Battle Log flow inside `TrialTowerWindow`
+- Tower player stance currently reuses the saved Arena stance fallback through `PlayerSaveManager`
+- Tower enemies are generated from floor data and scale by floor:
+  - HP
+  - attack
+  - defense
+  - armor
+  - agility
+  - reaction
+  - crit chance
+  - combat power
+
+Tower reward behavior:
+
+- first clear Victory gives full floor EXP and full Arena Tokens
+- repeat clear Victory gives reduced rewards
+- repeat clear currently gives 35% EXP and 25% Arena Tokens
+- Defeat and Draw do not unlock the next floor
+- Tower currently rewards only EXP and Arena Tokens
+- Tower loot drops are not implemented yet
 
 ### CombatSimulator
 
@@ -357,6 +438,8 @@ Saved progression fields:
 - Arena Tokens
 - allocated stat points
 - selected Arena combat stance
+- Tower unlocked floor
+- Tower cleared floor list
 
 The allocated stat fields are saved together with available stat points so spent points do not disappear after loading.
 
@@ -398,6 +481,8 @@ Save triggers:
 - inventory add/remove through `PlayerInventory`
 - selecting Arena combat stance through `ArenaWindowUI`
 - buying items in MarketWindow through `PlayerInventory.AddItem`
+- selling items in MarketWindow through `PlayerInventory.RemoveItem`
+- clearing Tower floors through `TowerWindowUI`
 
 Load flow:
 
@@ -412,6 +497,8 @@ Load flow:
 - restored equipment is refreshed once through the existing equipment stat flow
 - `ArenaWindowUI` loads selected Arena combat stance from `PlayerSaveManager`
 - missing/old stance save data falls back safely to `Standard`
+- `TowerWindowUI` loads unlocked floor and cleared floor list from `PlayerSaveManager`
+- missing/old Tower save data falls back safely to floor 1 unlocked and no cleared floors
 
 Development reset:
 
@@ -446,9 +533,15 @@ Current completed or working systems:
 - direct Barracks opening from city hub
 - direct Arena opening from city hub
 - direct Market opening from city hub
-- MarketWindow v1
+- direct Tower of Trials opening from city hub
+- MarketWindow v2
+- Market Buy mode
+- Market Sell mode
+- Market category filtering
 - Arena Token shop purchases
 - test equipment purchase flow through Market
+- unequipped item sell flow through Market
+- equipped item sale protection
 - ArenaWindow v1
 - generated Arena enemy cards
 - Arena enemy generation from player combat power
@@ -466,6 +559,12 @@ Current completed or working systems:
 - Draw reward handling
 - EXP rewards from Arena
 - Arena Tokens rewards from Arena
+- Tower of Trials v1
+- Tower 10-floor PvE progression
+- Tower locked / available / cleared floor states
+- Tower first-clear rewards
+- Tower repeat-clear reduced rewards
+- persistent Tower unlocked floor and cleared floor list
 - level up from EXP
 - combat power growth from level/stat scaling
 - equipment refresh after Arena level-up
@@ -491,6 +590,7 @@ Implemented:
 - progression load during `PlayerStats.Start()`
 - progression save after EXP gain, token gain, level-up, and stat allocation
 - selected Arena combat stance persistence
+- Tower unlocked/cleared floor persistence
 - inventory item instance persistence
 - equipped item slot persistence
 - stable item IDs through `ItemData.itemId`
@@ -498,6 +598,7 @@ Implemented:
 - equipment restore through `EquipmentManager.RestoreEquipmentFromSave`
 - save after equip / unequip
 - save after inventory add / remove
+- save after Tower floor clear / unlock
 - development reset through `PlayerStats` context menu
 
 Not implemented yet:
@@ -873,6 +974,68 @@ Generated reward scaling:
 - Hard enemies use higher EXP/token scaling
 - the existing EXP reward multiplier still applies after base EXP generation
 
+## Tower of Trials v1
+
+Tower of Trials is the first PvE progression system.
+
+Current Tower flow:
+
+1. Player opens `TrialTowerWindow` from the city hub Tower building.
+2. Player chooses an available floor from the scrollable floor list.
+3. Enter launches combat through the existing `CombatSimulator`.
+4. `CombatPlaybackUI` plays the already-calculated fight using the same side-view playback architecture.
+5. ResultPanel-style summary appears after playback.
+6. Victory on first clear marks the floor as cleared and unlocks the next floor.
+7. Tower progress is saved through `PlayerSaveManager`.
+8. Continue returns to the Tower floor list.
+
+Tower floor progression:
+
+- total floors: 10
+- floor 1 is unlocked by default
+- each floor can be Locked, Available, or Cleared
+- locked floors are greyed out and cannot be entered
+- current available floor is visually highlighted
+- cleared floors remain cleared after restart
+- clearing floor N unlocks floor N + 1 until floor 10
+
+Tower enemy scaling:
+
+- Tower enemies are currently generated from floor number rather than current player power
+- each floor has authored/generated lightweight floor data:
+  - enemy name
+  - recommended level
+  - combat power
+  - HP
+  - attack
+  - defense
+  - armor
+  - agility
+  - reaction
+  - crit chance
+  - EXP reward
+  - Arena Token reward
+- Tower enemies are intended to feel PvE-oriented and should later get stronger floor identity, boss floors, and themed enemy art
+
+Tower rewards:
+
+- first-clear Victory gives full floor EXP and full Arena Tokens
+- repeat-clear Victory gives reduced rewards
+- repeat-clear rewards currently use 35% EXP and 25% Arena Tokens
+- Defeat does not unlock the next floor
+- Draw does not unlock the next floor
+- Tower currently rewards only EXP and Arena Tokens
+- Tower does not yet drop items
+
+Tower reuse rules:
+
+- do not create a second combat system for Tower
+- continue reusing `CombatSimulator`
+- continue reusing `CombatPlaybackUI`
+- continue reusing the stable `CharacterPanel`
+- continue using the existing progression/save flow for EXP, Arena Tokens, level-up, and equipment stat refresh
+- Tower-specific work should mostly live in `TowerWindowUI` and save-data extensions unless a shared abstraction becomes clearly useful
+
 ## Important Rules
 
 - Do not rename existing scenes, GameObjects, scripts, serialized fields, or inspector references unless absolutely necessary.
@@ -926,27 +1089,36 @@ Double-apply is avoided because Arena does not call `ApplyItemStats` directly.
 
 Recommended next development direction:
 
-1. Redesign Market by analogy with BarracksWindow: category buttons on the left and item cards on the right
-2. Add Market Buy mode and Sell mode
-3. In Buy mode, show shop items by category
-4. In Sell mode, show player-owned items by category
-5. Selling should return 50% of the item base/shop price
-6. Market item cards should show icon, rarity, level requirement, stats, price, and Buy/Sell button
-7. Replace procedural Combat Playback placeholder SFX with real authored audio assets
-8. Test pose-based Combat Playback timing/readability on mobile aspect ratios
-9. Polish enemy HUD alignment, especially HP/MP bar placement and mirrored frame spacing
-10. Tune hit feel further: camera shake intensity, hit stop duration, crit flash strength, and smoother HP animation
-11. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
-12. Add explicit New Game / Reset Progress debug UI
-13. Add save versioning / migration guard before save data grows further
-14. Test and tune generated Arena enemy balance against real saved characters
-15. Add Arena rank progression and token economy later
-16. Add Arena combat balance pass after testing real outcomes
+1. Add Tower Loot v1
+2. Add a post-battle loot popup after Tower victories
+3. Start with curated/static Tower drops before procedural loot
+4. Save dropped items through the existing `PlayerInventory.AddItem` and item persistence flow
+5. Add simple floor-based drop tables for early Tower floors
+6. Keep future procedural loot as a later system after curated drops feel good
+7. Continue polishing the core gameplay loop: Arena -> Tokens, Market -> Gear, Tower -> PvE progression
+8. Replace procedural Combat Playback placeholder SFX with real authored audio assets
+9. Test pose-based Combat Playback timing/readability on mobile aspect ratios
+10. Polish enemy HUD alignment, especially HP/MP bar placement and mirrored frame spacing
+11. Tune hit feel further: camera shake intensity, hit stop duration, crit flash strength, and smoother HP animation
+12. Give Tower stronger visual identity: floor themes, boss floors, PvE enemy portraits, and floor-specific mood
+13. Replace temporary pose placeholders with real authored fighter pose sprites when art direction is ready
+14. Add explicit New Game / Reset Progress debug UI
+15. Add save versioning / migration guard before save data grows further
+16. Test and tune generated Arena and Tower combat balance against real saved characters
+17. Add Arena rank progression and token economy later
+18. Add Arena combat balance pass after testing real outcomes
 
 Good follow-up systems:
 
-- Market v2 buy/sell economy
-- item rewards / loot drops saved through `PlayerInventory.AddItem`
+- Tower Loot v1
+- post-battle loot popup
+- curated/static item drops saved through `PlayerInventory.AddItem`
+- procedural item generation later, after curated drops and the PvE loop are proven
 - combat balance pass for dodge, block, crit, and damage formulas
 - improve Combat Playback with audio, hit feel, camera shake, modular puppet parts, VFX, pacing controls, or replay support
 - shield item type / shield equipment slot if the design needs shield blocking
+
+Current product focus:
+
+- prioritize gameplay feel, progression loop clarity, and Tower PvE identity
+- avoid adding many disconnected systems before Arena, Market, Barracks, and Tower form a satisfying loop
