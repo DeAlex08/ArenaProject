@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3935fcde17e419bb8a58c4b683339e, type: 3}
+  m_Name: T1_Berserker_Belt
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemId: T1_Berserker_Belt
+  itemName: Berserker Belt
+  itemType: 4
+  rarity: 0
+  icon: {fileID: 5838343063622585289, guid: 0bc57dccbbe1e43a19b8aecb6f589732, type: 3}
+  requiredLevel: 1
+  minDamage: 0
+  maxDamage: 0
+  armor: 0
+  strength: 0
+  rage: 6
+  reaction: 0
+  agility: 0
+  endurance: 4
+  luck: 0
+  intelligence: 0
+  price: 50

@@ -46,6 +46,8 @@ public class MarketWindowUI : MonoBehaviour
     private Image buyModeBackground;
     private Image sellModeBackground;
     private RectTransform content;
+    private Sprite marketFrameSprite;
+    private Sprite itemCardFrameSprite;
     private readonly List<CategoryButtonBinding> categoryButtons = new List<CategoryButtonBinding>();
 
     private MarketMode currentMode = MarketMode.Buy;
@@ -53,16 +55,91 @@ public class MarketWindowUI : MonoBehaviour
     private bool isProcessingTransaction;
     private bool isBuilt;
 
-    private static readonly Color BackgroundColor = new Color(0.04f, 0.035f, 0.03f, 0.96f);
-    private static readonly Color PanelColor = new Color(0.11f, 0.095f, 0.075f, 0.92f);
-    private static readonly Color CardColor = new Color(0.18f, 0.155f, 0.115f, 0.95f);
-    private static readonly Color ButtonColor = new Color(0.09f, 0.065f, 0.04f, 0.96f);
-    private static readonly Color SelectedColor = new Color(0.35f, 0.235f, 0.095f, 0.98f);
+    private static readonly Color BackgroundColor = new Color(0.035f, 0.03f, 0.025f, 0.96f);
+    private static readonly Color PanelColor = new Color(0.075f, 0.065f, 0.052f, 0.94f);
+    private static readonly Color CardColor = new Color(0.18f, 0.165f, 0.13f, 0.94f);
+    private static readonly Color ButtonColor = new Color(0.075f, 0.058f, 0.04f, 0.96f);
+    private static readonly Color SelectedColor = new Color(0.32f, 0.215f, 0.085f, 0.98f);
     private static readonly Color DisabledColor = new Color(0.12f, 0.12f, 0.12f, 0.85f);
     private static readonly Color GoldColor = new Color(0.9f, 0.69f, 0.36f, 1f);
     private static readonly Color TextColor = new Color(0.88f, 0.82f, 0.68f, 1f);
     private static readonly Color MutedTextColor = new Color(0.62f, 0.57f, 0.48f, 1f);
     private static readonly Color WarningColor = new Color(0.95f, 0.38f, 0.28f, 1f);
+    private static readonly Color BorderColor = new Color(0.58f, 0.43f, 0.22f, 0.72f);
+    private static readonly Color DarkBorderColor = new Color(0.02f, 0.017f, 0.013f, 1f);
+    private static readonly Color PriceColor = new Color(1f, 0.78f, 0.33f, 1f);
+
+    private static readonly Dictionary<string, int> TierOneShopPrices = new Dictionary<string, int>
+    {
+        { "T1_Berserker_RustySword", 50 },
+        { "T1_Berserker_Blade", 150 },
+        { "T1_Berserker_BloodrageGreatsword", 400 },
+        { "T1_Berserker_CrackedHelm", 50 },
+        { "T1_Berserker_Helm", 150 },
+        { "T1_Berserker_BloodrageHelm", 400 },
+        { "T1_Berserker_WornArmor", 50 },
+        { "T1_Berserker_Armor", 150 },
+        { "T1_Berserker_BloodrageArmor", 400 },
+        { "T1_Berserker_Gloves", 50 },
+        { "T1_Berserker_Gauntlets", 150 },
+        { "T1_Berserker_BloodrageGauntlets", 400 },
+        { "T1_Berserker_Boots", 50 },
+        { "T1_Berserker_RareBoots", 150 },
+        { "T1_Berserker_BloodrageBoots", 400 },
+        { "T1_Berserker_Ring", 180 },
+        { "T1_Berserker_BloodrageRing", 450 },
+        { "T1_Berserker_Amulet", 180 },
+        { "T1_Berserker_BloodrageAmulet", 450 },
+        { "T1_Berserker_Belt", 50 },
+        { "T1_Berserker_WarBelt", 180 },
+        { "T1_Berserker_BloodrageBelt", 450 },
+
+        { "T1_Gambler_RustyDagger", 50 },
+        { "T1_Gambler_Blade", 150 },
+        { "T1_Gambler_Fatepiercer", 400 },
+        { "T1_Gambler_Hood", 50 },
+        { "T1_Gambler_RareHood", 150 },
+        { "T1_Gambler_FateHood", 400 },
+        { "T1_Gambler_Vest", 50 },
+        { "T1_Gambler_RareVest", 150 },
+        { "T1_Gambler_FateVest", 400 },
+        { "T1_Gambler_Gloves", 50 },
+        { "T1_Gambler_RareGloves", 150 },
+        { "T1_Gambler_FateGloves", 400 },
+        { "T1_Gambler_Boots", 50 },
+        { "T1_Gambler_RareBoots", 150 },
+        { "T1_Gambler_FateBoots", 400 },
+        { "T1_Gambler_Ring", 180 },
+        { "T1_Gambler_FateRing", 450 },
+        { "T1_Gambler_Amulet", 180 },
+        { "T1_Gambler_FateAmulet", 450 },
+        { "T1_Gambler_Belt", 50 },
+        { "T1_Gambler_LuckyBelt", 180 },
+        { "T1_Gambler_FateBelt", 450 },
+
+        { "T1_Duelist_TrainingRapier", 50 },
+        { "T1_Duelist_Rapier", 150 },
+        { "T1_Duelist_SwiftRapier", 400 },
+        { "T1_Duelist_Mask", 50 },
+        { "T1_Duelist_RareMask", 150 },
+        { "T1_Duelist_SwiftMask", 400 },
+        { "T1_Duelist_Jacket", 50 },
+        { "T1_Duelist_RareJacket", 150 },
+        { "T1_Duelist_SwiftJacket", 400 },
+        { "T1_Duelist_Gloves", 50 },
+        { "T1_Duelist_RareGloves", 150 },
+        { "T1_Duelist_SwiftGloves", 400 },
+        { "T1_Duelist_Boots", 50 },
+        { "T1_Duelist_RareBoots", 150 },
+        { "T1_Duelist_SwiftBoots", 400 },
+        { "T1_Duelist_Ring", 180 },
+        { "T1_Duelist_SwiftRing", 450 },
+        { "T1_Duelist_Amulet", 180 },
+        { "T1_Duelist_SwiftAmulet", 450 },
+        { "T1_Duelist_Belt", 50 },
+        { "T1_Duelist_FineBelt", 180 },
+        { "T1_Duelist_SwiftBelt", 450 }
+    };
 
     private readonly ItemType[] categoryOrder =
     {
@@ -81,12 +158,14 @@ public class MarketWindowUI : MonoBehaviour
     private void Awake()
     {
         ResolveReferences();
+        LoadVisualAssets();
         EnsureDefaultShopEntries();
     }
 
     private void OnEnable()
     {
         ResolveReferences();
+        LoadVisualAssets();
         EnsureDefaultShopEntries();
 
         if (!isBuilt)
@@ -112,7 +191,7 @@ public class MarketWindowUI : MonoBehaviour
         if (background == null)
             background = gameObject.AddComponent<Image>();
 
-        background.color = BackgroundColor;
+        ApplySpriteImage(background, marketFrameSprite, Color.white, BackgroundColor);
         background.raycastTarget = true;
 
         RectTransform root = GetComponent<RectTransform>();
@@ -152,6 +231,7 @@ public class MarketWindowUI : MonoBehaviour
     private void CreateCategoryPanel(RectTransform root)
     {
         RectTransform panel = CreatePanel("CategoryPanel", root, new Vector2(-530f, -90f), new Vector2(260f, 760f), PanelColor);
+        AddFrame(panel.gameObject, BorderColor, new Vector2(2f, -2f));
 
         VerticalLayoutGroup layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
         layout.padding = new RectOffset(12, 12, 16, 16);
@@ -187,6 +267,7 @@ public class MarketWindowUI : MonoBehaviour
     private void CreateItemsPanel(RectTransform root)
     {
         RectTransform listPanel = CreatePanel("ItemsPanel", root, new Vector2(145f, -90f), new Vector2(1040f, 760f), PanelColor);
+        AddFrame(listPanel.gameObject, BorderColor, new Vector2(2f, -2f));
 
         ScrollRect scrollRect = listPanel.gameObject.AddComponent<ScrollRect>();
         scrollRect.horizontal = false;
@@ -345,20 +426,34 @@ public class MarketWindowUI : MonoBehaviour
 
     private void CreateMarketCard(ItemData item, int price, string actionText, bool canClick, UnityEngine.Events.UnityAction action)
     {
-        RectTransform card = CreatePanel("MarketCard_" + ItemDatabase.GetStableItemId(item), content, Vector2.zero, new Vector2(930f, 170f), CardColor);
+        RectTransform card = CreatePanel("MarketCard_" + ItemDatabase.GetStableItemId(item), content, Vector2.zero, new Vector2(930f, 236f), CardColor);
+        Image cardImage = card.GetComponent<Image>();
+        ApplySpriteImage(cardImage, itemCardFrameSprite, Color.white, CardColor);
+
+        if (itemCardFrameSprite == null)
+            AddFrame(card.gameObject, GetRarityColor(item.rarity), new Vector2(2f, -2f));
+
         LayoutElement layoutElement = card.gameObject.AddComponent<LayoutElement>();
         layoutElement.minWidth = 900f;
         layoutElement.preferredWidth = 930f;
-        layoutElement.minHeight = 170f;
-        layoutElement.preferredHeight = 170f;
+        layoutElement.minHeight = 236f;
+        layoutElement.preferredHeight = 236f;
 
-        CreateIcon(card, item.icon, new Vector2(-405f, 0f), new Vector2(112f, 112f));
-        CreateText("ItemName", card, item.itemName, new Vector2(-250f, 48f), new Vector2(330f, 38f), 24, GoldColor, TextAlignmentOptions.Left);
-        CreateText("Meta", card, GetRarityLabel(item.rarity) + "  LVL " + Mathf.Max(item.requiredLevel, 1), new Vector2(-250f, 10f), new Vector2(330f, 32f), 18, TextColor, TextAlignmentOptions.Left);
-        CreateText("Stats", card, BuildStatsText(item), new Vector2(80f, 8f), new Vector2(430f, 110f), 18, TextColor, TextAlignmentOptions.Left);
-        CreateText("Price", card, price + " Tokens", new Vector2(360f, 44f), new Vector2(160f, 34f), 20, GoldColor, TextAlignmentOptions.Center);
+        CreateIcon(card, item.icon, new Vector2(-360f, 10f), new Vector2(118f, 118f));
 
-        Button actionButton = CreateButton("ActionButton", card, actionText, new Vector2(360f, -34f), new Vector2(170f, 56f), 21);
+        TMP_Text itemName = CreateText("ItemName", card, item.itemName, new Vector2(-155f, 78f), new Vector2(390f, 38f), 24, GetRarityColor(item.rarity), TextAlignmentOptions.Left);
+        itemName.fontStyle = FontStyles.Bold;
+
+        CreateText("Meta", card, GetRarityLabel(item.rarity) + "  |  " + GetSlotLabel(item.itemType) + "  |  LVL " + Mathf.Max(item.requiredLevel, 1), new Vector2(-155f, 42f), new Vector2(390f, 30f), 17, MutedTextColor, TextAlignmentOptions.Left);
+
+        TMP_Text stats = CreateText("Stats", card, BuildStatsText(item), new Vector2(65f, -25f), new Vector2(450f, 118f), 18, TextColor, TextAlignmentOptions.Left);
+        stats.textWrappingMode = TextWrappingModes.Normal;
+        stats.lineSpacing = -10f;
+
+        TMP_Text priceText = CreateText("Price", card, price + "\nTOKENS", new Vector2(346f, 48f), new Vector2(150f, 58f), 20, PriceColor, TextAlignmentOptions.Center);
+        priceText.fontStyle = FontStyles.Bold;
+
+        Button actionButton = CreateButton("ActionButton", card, actionText, new Vector2(346f, -48f), new Vector2(170f, 58f), 21);
         actionButton.interactable = canClick;
 
         Image buttonImage = actionButton.targetGraphic as Image;
@@ -372,6 +467,7 @@ public class MarketWindowUI : MonoBehaviour
     private void CreateIcon(Transform parent, Sprite sprite, Vector2 anchoredPosition, Vector2 size)
     {
         RectTransform frame = CreatePanel("IconFrame", parent, anchoredPosition, size, new Color(0.055f, 0.05f, 0.045f, 0.96f));
+        AddFrame(frame.gameObject, BorderColor, new Vector2(2f, -2f));
 
         GameObject iconObject = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
         iconObject.layer = gameObject.layer;
@@ -509,11 +605,17 @@ public class MarketWindowUI : MonoBehaviour
     {
         List<string> parts = new List<string>();
 
+        if (item.itemType == ItemType.Weapon && item.strength > 0)
+            AddStat(parts, "Attack", item.strength);
+
         if (item.minDamage > 0 || item.maxDamage > 0)
             parts.Add("Damage " + item.minDamage + "-" + item.maxDamage);
 
-        AddStat(parts, "Armor", item.armor);
-        AddStat(parts, "Strength", item.strength);
+        AddStat(parts, GetArmorStatLabel(item.itemType), item.armor);
+
+        if (item.itemType != ItemType.Weapon)
+            AddStat(parts, "Strength", item.strength);
+
         AddStat(parts, "Rage", item.rage);
         AddStat(parts, "Reaction", item.reaction);
         AddStat(parts, "Agility", item.agility);
@@ -521,13 +623,30 @@ public class MarketWindowUI : MonoBehaviour
         AddStat(parts, "Luck", item.luck);
         AddStat(parts, "Intelligence", item.intelligence);
 
-        return parts.Count > 0 ? string.Join("  ", parts) : "No stat bonuses";
+        return parts.Count > 0 ? string.Join("\n", parts) : "No stat bonuses";
     }
 
     private void AddStat(List<string> parts, string label, int value)
     {
         if (value != 0)
             parts.Add(label + " +" + value);
+    }
+
+    private string GetArmorStatLabel(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Helmet:
+                return "ArmorHead";
+            case ItemType.Armor:
+                return "ArmorBody";
+            case ItemType.Gloves:
+                return "ArmorArms";
+            case ItemType.Boots:
+                return "ArmorLegs";
+            default:
+                return "Armor";
+        }
     }
 
     private string GetRarityLabel(ItemRarity rarity)
@@ -548,6 +667,25 @@ public class MarketWindowUI : MonoBehaviour
                 return "Named";
             default:
                 return rarity.ToString();
+        }
+    }
+
+    private Color32 GetRarityColor(ItemRarity rarity)
+    {
+        switch (rarity)
+        {
+            case ItemRarity.Rare:
+                return new Color32(63, 167, 255, 255);
+            case ItemRarity.Epic:
+                return new Color32(163, 53, 238, 255);
+            case ItemRarity.Legendary:
+                return new Color32(214, 168, 74, 255);
+            case ItemRarity.Mythic:
+                return new Color32(255, 70, 70, 255);
+            case ItemRarity.Named:
+                return new Color32(255, 140, 40, 255);
+            default:
+                return new Color32(190, 185, 170, 255);
         }
     }
 
@@ -580,6 +718,35 @@ public class MarketWindowUI : MonoBehaviour
         }
     }
 
+    private string GetSlotLabel(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Helmet:
+                return "Helmet";
+            case ItemType.Weapon:
+                return "Weapon";
+            case ItemType.Armor:
+                return "Chest";
+            case ItemType.Gloves:
+                return "Gloves";
+            case ItemType.Belt:
+                return "Belt";
+            case ItemType.Legs:
+                return "Legs";
+            case ItemType.Boots:
+                return "Boots";
+            case ItemType.Ring:
+                return "Ring";
+            case ItemType.Amulet:
+                return "Amulet";
+            case ItemType.Artifact:
+                return "Artifact";
+            default:
+                return itemType.ToString();
+        }
+    }
+
     private TMP_Text CreateText(string objectName, Transform parent, string text, Vector2 anchoredPosition, Vector2 size, int fontSize, Color color, TextAlignmentOptions alignment)
     {
         GameObject textObject = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
@@ -607,10 +774,17 @@ public class MarketWindowUI : MonoBehaviour
     private Button CreateButton(string objectName, Transform parent, string text, Vector2 anchoredPosition, Vector2 size, int fontSize)
     {
         RectTransform buttonRect = CreatePanel(objectName, parent, anchoredPosition, size, ButtonColor);
-        Button button = buttonRect.gameObject.AddComponent<Button>();
-        button.targetGraphic = buttonRect.GetComponent<Image>();
+        Image buttonImage = buttonRect.GetComponent<Image>();
+        ApplySpriteImage(buttonImage, marketFrameSprite, Color.white, ButtonColor);
 
-        CreateText("Text", buttonRect, text, Vector2.zero, size, fontSize, GoldColor, TextAlignmentOptions.Center);
+        if (marketFrameSprite == null)
+            AddFrame(buttonRect.gameObject, BorderColor, new Vector2(2f, -2f));
+
+        Button button = buttonRect.gameObject.AddComponent<Button>();
+        button.targetGraphic = buttonImage;
+
+        TMP_Text label = CreateText("Text", buttonRect, text, Vector2.zero, size, fontSize, GoldColor, TextAlignmentOptions.Center);
+        label.fontStyle = FontStyles.Bold;
 
         return button;
     }
@@ -633,6 +807,41 @@ public class MarketWindowUI : MonoBehaviour
         image.raycastTarget = true;
 
         return rectTransform;
+    }
+
+    private void AddFrame(GameObject target, Color color, Vector2 distance)
+    {
+        if (target == null)
+            return;
+
+        Outline darkOutline = target.AddComponent<Outline>();
+        darkOutline.effectColor = DarkBorderColor;
+        darkOutline.effectDistance = distance * 2f;
+        darkOutline.useGraphicAlpha = true;
+
+        Outline goldOutline = target.AddComponent<Outline>();
+        goldOutline.effectColor = color;
+        goldOutline.effectDistance = distance;
+        goldOutline.useGraphicAlpha = true;
+    }
+
+    private void ApplySpriteImage(Image image, Sprite sprite, Color spriteColor, Color fallbackColor)
+    {
+        if (image == null)
+            return;
+
+        if (sprite != null)
+        {
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.color = spriteColor;
+        }
+        else
+        {
+            image.sprite = null;
+            image.color = fallbackColor;
+        }
     }
 
     private void ClearChildren(Transform parent)
@@ -665,21 +874,43 @@ public class MarketWindowUI : MonoBehaviour
             equipmentManager = FindSceneObject<EquipmentManager>();
     }
 
+    private void LoadVisualAssets()
+    {
+        if (marketFrameSprite == null)
+            marketFrameSprite = LoadSpriteResource("Market/MarketFrame");
+
+        if (itemCardFrameSprite == null)
+            itemCardFrameSprite = LoadSpriteResource("Market/MarketItemCardFrame");
+    }
+
+    private Sprite LoadSpriteResource(string resourcePath)
+    {
+        Sprite sprite = Resources.Load<Sprite>(resourcePath);
+
+        if (sprite != null)
+            return sprite;
+
+        Texture2D texture = Resources.Load<Texture2D>(resourcePath);
+
+        if (texture == null)
+            return null;
+
+        return Sprite.Create(
+            texture,
+            new Rect(0f, 0f, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f),
+            100f);
+    }
+
     private void EnsureDefaultShopEntries()
     {
-        AddMissingShopEntry("Helmet_Long", 1250);
-        AddMissingShopEntry("Helmet_Lord", 1650);
-        AddMissingShopEntry("Sword_Pain", 1650);
-        AddMissingShopEntry("Sword_Rage", 230);
-        AddMissingShopEntry("Armor_Test", 30);
-        AddMissingShopEntry("Gloves_Test", 20);
-        AddMissingShopEntry("Belt_Test", 20);
-        AddMissingShopEntry("Legs_Test", 25);
-        AddMissingShopEntry("Boots_Test", 20);
-        AddMissingShopEntry("Ring_Test", 35);
-        AddMissingShopEntry("Amulet_Test", 40);
-        AddMissingShopEntry("Artifact_Test", 50);
-        shopEntries.RemoveAll(entry => entry == null || entry.itemData == null);
+        shopEntries.RemoveAll(entry =>
+            entry == null ||
+            entry.itemData == null ||
+            !TierOneShopPrices.ContainsKey(ItemDatabase.GetStableItemId(entry.itemData)));
+
+        foreach (KeyValuePair<string, int> shopItem in TierOneShopPrices)
+            AddMissingShopEntry(shopItem.Key, shopItem.Value);
     }
 
     private void AddMissingShopEntry(string itemId, int fallbackPrice)

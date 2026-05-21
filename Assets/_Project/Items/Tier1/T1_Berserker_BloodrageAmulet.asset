@@ -1,0 +1,31 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd3935fcde17e419bb8a58c4b683339e, type: 3}
+  m_Name: T1_Berserker_BloodrageAmulet
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemId: T1_Berserker_BloodrageAmulet
+  itemName: Bloodrage Amulet
+  itemType: 8
+  rarity: 2
+  icon: {fileID: 7318211818263086454, guid: 8962ac650e5e943219e07fa818dfdd8a, type: 3}
+  requiredLevel: 1
+  minDamage: 0
+  maxDamage: 0
+  armor: 0
+  strength: 0
+  rage: 16
+  reaction: 0
+  agility: 0
+  endurance: 8
+  luck: 10
+  intelligence: 0
+  price: 450

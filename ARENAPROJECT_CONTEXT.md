@@ -38,7 +38,7 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks, Arena, Market, and Tower of Trials.
 
-## Current Project State After Tower of Trials v1
+## Current Project State After Combat Balance v1 And Tier 1 Market Gear
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -50,14 +50,14 @@ The project currently compiles at the script level and the main gameplay loop is
 - Barracks inventory/equipment UI continues to use existing item instances and equipment state
 - MarketWindow opens from the city hub and provides a category-based Arena Token shop
 - MarketWindow supports Buy and Sell modes
-- MarketWindow sells test equipment items and adds purchases to `PlayerInventory`
+- MarketWindow sells static Tier 1 Level 1-10 gear items and adds purchases to `PlayerInventory`
 - MarketWindow can sell unequipped player-owned items back for partial Arena Tokens
 - purchased Market items persist through the existing inventory/equipment save-load flow
 - ArenaWindow opens from the city hub and shows three generated selectable enemies
 - Arena opponents are regenerated from current player combat power when ArenaWindow opens
 - Arena has a free `Refresh Opponents` button that regenerates the enemy list
 - EnemyInfoPanel shows the generated combat details for the selected opponent
-- selecting Fight runs Combat Simulation v1 through `CombatSimulator`
+- selecting Fight runs Combat Balance v1 through the shared `CombatSimulator`
 - after Fight, ArenaWindow opens `CombatPlaybackPanel` before showing ResultPanel
 - Combat Playback visually plays already-calculated combat events and does not recalculate the fight
 - Combat Playback v1 now uses pose-based fighter sprites through `CombatFighterPuppetUI`
@@ -79,14 +79,14 @@ The project currently compiles at the script level and the main gameplay loop is
 - Tower of Trials is the first PvE progression system
 - Tower uses 10 floor cards with locked, available, and cleared states
 - clearing Tower floors unlocks the next floor and persists through the existing local JSON save
-- Tower fights reuse `CombatSimulator`, `CombatPlaybackUI`, ResultPanel-style flow, Battle Log, and the stable left `CharacterPanel`
+- Tower fights reuse the shared Combat Balance v1 `CombatSimulator`, `CombatPlaybackUI`, ResultPanel-style flow, Battle Log, and the stable left `CharacterPanel`
 - Tower enemies scale by floor power/stats instead of current player power
 - Tower rewards EXP and Arena Tokens, with full first-clear rewards and reduced repeat-clear rewards
 
 Current live progression loop:
 
 - Arena -> earn Arena Tokens and EXP through generated PvP-style duels
-- Market -> spend Arena Tokens on gear upgrades or sell unequipped items
+- Market -> spend Arena Tokens on Tier 1 gear upgrades or sell unequipped items
 - Barracks -> equip and compare gear, refresh player combat power
 - Tower of Trials -> push PvE floors for progression, EXP, and additional Arena Tokens
 
@@ -97,7 +97,7 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
-- MarketWindow v2 is functional, but still uses temporary shop data and needs visual polish against BarracksWindow
+- MarketWindow v2 is functional and now uses the static Tier 1 Level 1-10 gear pool, but still needs visual polish against BarracksWindow
 - no loot drop system exists yet
 - no procedural item generation exists yet
 - Tower currently rewards only EXP and Arena Tokens
@@ -106,6 +106,7 @@ Current known limitations:
 - EnemyPanel uses a custom fantasy frame and orc portrait, but HP/MP alignment still needs later polish
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
 - shield blocking is supported in code but no shield item type/data exists yet
+- Defense still exists in current combat code and enemy data, but the long-term design direction is to remove Defense and make body-zone Armor the main mitigation stat
 - Arena enemies are generated from current player combat power, but are not saved yet
 - Arena rank progression is intentionally not implemented yet
 
@@ -164,7 +165,7 @@ Current Arena features:
 - `EnemyInfoPanel` opens inside ArenaWindow for selected enemy details and displays generated combat stats
 - compact player stance selector lives inside ArenaWindow
 - `CombatPlaybackPanel` opens after pressing Fight and before ResultPanel
-- `ResultPanel` opens inside ArenaWindow after Combat Simulation v1
+- `ResultPanel` opens inside ArenaWindow after Combat Balance v1
 - `BattleLogPanel` opens inside ArenaWindow from the ResultPanel Battle Log button
 - no real animated combat scene exists yet
 
@@ -213,15 +214,38 @@ Current Market v2 features:
 - Buy mode shows shop items filtered by selected category
 - Sell mode shows player-owned inventory items filtered by selected category
 - item cards show item name, type/category, rarity/level when available, stats, price, and the relevant Buy/Sell button
-- current shop offers test equipment items:
-  - `Armor_Test`
-  - `Gloves_Test`
-  - `Belt_Test`
-  - `Legs_Test`
-  - `Boots_Test`
-  - `Ring_Test`
-  - `Amulet_Test`
-  - `Artifact_Test`
+- current Buy mode offers a static Tier 1 Level 1-10 gear pool
+- old placeholder/test items are no longer part of the Market buy pool
+- Tier 1 gear assets live under `Assets/_Project/Items/Tier1`
+- 66 Tier 1 `ItemData` assets currently exist
+- Tier 1 archetypes:
+  - Berserker: attack-related stats plus Rage
+  - Gambler: attack-related stats plus Luck
+  - Duelist: Agility plus Reaction, with lighter weapon attack
+- Tier 1 rarities:
+  - Common
+  - Rare
+  - Epic
+- Uncommon, Legendary, and Mythic Tier 1 market items are intentionally not implemented yet
+- Tier 1 Market slots:
+  - Weapon
+  - Helmet
+  - Armor
+  - Gloves
+  - Boots
+  - Ring
+  - Amulet
+  - Belt
+- weapons represent attack through the existing item/stat fields and display as Attack in Market/Barracks item text
+- armor pieces represent body-zone armor in display:
+  - Helmet -> ArmorHead
+  - Armor -> ArmorBody
+  - Gloves -> ArmorArms
+  - Boots -> ArmorLegs
+- current underlying player stat architecture still stores equipment armor as the existing shared `armor` stat
+- accessories do not give Attack or Armor
+- accessories compensate with stronger or additional combat stats
+- percent modifiers are planned for later, but are not implemented yet because `ItemData` does not currently support them safely
 - purchases subtract Arena Tokens from `PlayerStats`
 - purchases add a new item instance through `PlayerInventory.AddItem`
 - purchases persist through the existing progression/inventory save-load flow
@@ -233,9 +257,38 @@ Current Market v2 features:
 
 Important Market notes:
 
-- existing saved players can acquire the test equipment items through Market without resetting saves or injecting items into save data
+- existing saved players can acquire Tier 1 gear through Market without resetting saves or injecting items into save data
 - the current Market is functional and should not be removed while polishing visuals
 - future work should make Market cards visually closer to Barracks item cards
+
+### Gear Progression Design
+
+Long-term player max level target:
+
+- Level 80
+
+Planned static/progression gear bands:
+
+- Level 1-10
+- Level 11-20
+- Level 21-30
+- Level 31-40
+- Level 41-50
+- Level 51-60
+- Level 61-70
+- Level 71-80
+
+Current implemented gear band:
+
+- Level 1-10 only
+
+Important gear direction:
+
+- do not add Legendary or Mythic item effects until explicitly requested
+- do not add procedural loot yet
+- do not add percent modifiers until explicitly requested
+- future percent modifier candidates include CritDamageBonusPercent, LuckyDodgeBypassBonusPercent, ReactionDamageBonusPercent, and DodgeBypassResistPercent
+- future higher gear bands should build on the same static item pool approach first, before procedural item generation
 
 ### TowerWindow
 
@@ -295,12 +348,12 @@ Tower reward behavior:
 
 ### CombatSimulator
 
-`CombatSimulator` owns Arena Combat Simulation v1.
+`CombatSimulator` owns Combat Balance v1 and remains the shared combat core for Arena and Tower.
 
 Responsibilities:
 
-- simulate Arena fights outside `ArenaWindowUI`
-- run turn-based rounds
+- simulate fights outside location window UI classes
+- run simultaneous round-based combat
 - resolve simultaneous attacks
 - support body zones:
   - Head
@@ -313,7 +366,7 @@ Responsibilities:
   - Standard
   - Defensive
 - support weapon block now and shield block later
-- calculate dodge, block, crit, damage mitigation, and simple counterattacks
+- calculate dodge, block, crit, lucky hit, armor mitigation, and terminal reaction retaliation
 - produce a full readable combat log
 
 Important behavior:
@@ -322,13 +375,27 @@ Important behavior:
 - both fighters can die in the same round, causing Draw
 - if nobody dies after 20 rounds, higher remaining HP percentage wins
 - close remaining HP percentages produce Draw
-- body-zone damage modifiers are applied inside the simulator
-- dodge is based mainly on agility
-- counterattack chance is based mainly on reaction
-- crit chance uses explicit crit chance when available, otherwise safe luck-based fallback
-- armor/defense mitigation is applied before block mitigation
-- weapon block reduces roughly 50% damage
-- shield block reduces most damage and is prepared for future shield items
+- body-zone hit weights and damage modifiers are applied inside the simulator
+- current attack resolution order is:
+  1. body zone
+  2. base damage
+  3. crit and lucky rolls
+  4. dodge
+  5. block
+  6. armor
+  7. HP damage
+  8. reaction retaliation
+- Crit uses attacker Rage against defender Rage
+- Lucky Hit uses attacker Luck against defender Luck
+- Dodge uses defender Agility against attacker Agility
+- Reaction uses defender Reaction against attacker Reaction
+- Lucky Hit bypasses Block completely
+- Lucky Hit has a 25% chance to bypass Dodge
+- Lucky Crit is supported
+- Block fully negates damage when it succeeds
+- Reaction is terminal retaliation damage and cannot trigger dodge, block, another reaction, or an infinite chain
+- current armor mitigation is implemented in code and still includes Defense in the effective armor threshold
+- current design direction is to remove Defense later and make Armor the only mitigation stat
 - CombatSimulator does not apply rewards or save data directly
 - CombatSimulator returns structured playback events as calculation output, but does not play visuals
 - `ArenaWindowUI` remains responsible for UI flow and reward application
@@ -339,6 +406,22 @@ Important behavior:
   - blocks
   - remaining HP
   - player/enemy stances
+
+### Planned Combat Cleanup
+
+Current combat design decision:
+
+- remove Defense as a long-term combat stat
+- keep Armor by body zone
+- Armor should become the main mitigation stat
+- planned future mitigation formula:
+  - `FinalDamage = Damage * (1 - Armor / (Armor + 100))`
+
+Important:
+
+- do not implement this formula until explicitly requested
+- for now, this is documented as the next combat cleanup direction only
+- avoid adding more features on top of Defense unless a short-term compatibility bridge is required
 
 ### PlayerStats
 
@@ -539,7 +622,12 @@ Current completed or working systems:
 - Market Sell mode
 - Market category filtering
 - Arena Token shop purchases
-- test equipment purchase flow through Market
+- Tier 1 Level 1-10 static Market gear pool
+- 66 Tier 1 `ItemData` assets under `Assets/_Project/Items/Tier1`
+- Berserker, Gambler, and Duelist starter archetype gear
+- Common, Rare, and Epic starter gear rarities
+- old placeholder/test items removed from Market buy pool
+- Tier 1 equipment purchase flow through Market
 - unequipped item sell flow through Market
 - equipped item sale protection
 - ArenaWindow v1
@@ -547,7 +635,9 @@ Current completed or working systems:
 - Arena enemy generation from player combat power
 - free Arena opponent refresh
 - Arena `EnemyInfoPanel`
-- Arena Combat Simulation v1
+- Combat Balance v1 in shared `CombatSimulator`
+- simultaneous round combat shared by Arena and Tower
+- Crit, Lucky Hit, Lucky Crit, Dodge, full Block, Armor mitigation, and terminal Reaction retaliation
 - Arena Combat Playback v1
 - Arena combat stance selector UI
 - Arena `ResultPanel`
@@ -758,20 +848,24 @@ Arena Enemy Generation v1:
   - generated difficulty description
 - rank progression is not involved in enemy generation yet
 
-Combat Simulation v1:
+Combat Balance v1:
 
-- fights are turn-based by rounds
-- both fighters act simultaneously each round
+- fights are simultaneous and round-based
 - maximum duration is 20 rounds
-- attacks target one random body zone
+- both fighters act in the same round
+- attacks target weighted body zones
 - supported body zones: Head, Body, Left Arm, Right Arm, Legs
-- dodge uses agility
-- counterattack chance uses reaction after dodge or block
-- crit chance uses configured enemy crit chance or player luck/rage fallback
-- mitigation uses defense, armor, body zone modifier, and block modifier
-- weapon block reduces roughly half of incoming damage
-- shield block support exists in `CombatSimulator`, but no shield item type exists yet
-- minimum landed damage is always at least 1
+- attack order is body zone -> damage -> crit/lucky -> dodge -> block -> armor -> HP -> reaction
+- Crit uses Rage against Rage
+- Lucky Hit uses Luck against Luck
+- Lucky Hit bypasses Block and has a 25% chance to bypass Dodge
+- Lucky Crit is supported
+- Dodge uses Agility against Agility
+- Block fully negates damage
+- Reaction uses Reaction against Reaction
+- Reaction damage is terminal and cannot chain
+- current mitigation still uses Defense plus Armor in code
+- long-term direction is to remove Defense and make body-zone Armor the only mitigation stat
 - if nobody dies after 20 rounds, remaining HP percentage decides the winner
 - if remaining HP percentages are close enough, the result is Draw
 - if both fighters die in the same round, the result is Draw
@@ -1054,6 +1148,14 @@ Tower reuse rules:
 - `BarracksWindow` internals should not be touched unless required for safe refresh or bugfixing.
 - Keep everything inside `MainMenu` for now.
 - Do not create separate Unity scenes for locations yet.
+- Do not create duplicate combat systems.
+- Do not replace `CombatSimulator`.
+- Preserve the shared Arena/Tower combat flow.
+- Do not redesign `MarketWindow` architecture unless explicitly requested.
+- Do not add procedural loot yet.
+- Do not add Legendary/Mythic item effects yet.
+- Do not add percent modifiers until explicitly requested.
+- Preserve save/load compatibility.
 
 ## Important Bug Fix
 

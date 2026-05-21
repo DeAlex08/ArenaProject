@@ -88,8 +88,11 @@ public class ItemCardUI : MonoBehaviour
             stats.AppendLine("Урон: " + item.minDamage + " - " + item.maxDamage);
         }
 
-        if (item.armor > 0) stats.AppendLine("Защита: " + item.armor);
-        if (item.strength > 0) stats.AppendLine("Сила: " + item.strength);
+        if (item.itemType == ItemType.Weapon && item.strength > 0)
+            stats.AppendLine("Атака: " + item.strength);
+
+        if (item.armor > 0) stats.AppendLine(GetArmorStatText(item.itemType) + ": " + item.armor);
+        if (item.itemType != ItemType.Weapon && item.strength > 0) stats.AppendLine("Сила: " + item.strength);
         if (item.rage > 0) stats.AppendLine("Ярость: " + item.rage);
         if (item.reaction > 0) stats.AppendLine("Реакция: " + item.reaction);
         if (item.agility > 0) stats.AppendLine("Ловкость: " + item.agility);
@@ -99,6 +102,23 @@ public class ItemCardUI : MonoBehaviour
         if (item.price > 0) stats.AppendLine("Цена: " + item.price);
 
         return stats.ToString();
+    }
+
+    private string GetArmorStatText(ItemType itemType)
+    {
+        switch (itemType)
+        {
+            case ItemType.Helmet:
+                return "Защита головы";
+            case ItemType.Armor:
+                return "Защита корпуса";
+            case ItemType.Gloves:
+                return "Защита рук";
+            case ItemType.Boots:
+                return "Защита ног";
+            default:
+                return "Защита";
+        }
     }
 
     private string GetRarityText(ItemRarity rarity)
