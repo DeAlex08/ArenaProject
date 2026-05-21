@@ -131,6 +131,9 @@ public class CombatPlaybackUI : MonoBehaviour
     private readonly Color hitFlashColor = new Color(0.65f, 0.12f, 0.08f, 1f);
     private readonly Color dodgeColor = new Color(0.55f, 0.70f, 0.95f, 1f);
     private readonly Color blockColor = new Color(0.62f, 0.72f, 0.76f, 1f);
+    private readonly Color critColor = new Color(0.95f, 0.18f, 0.12f, 1f);
+    private readonly Color luckyColor = new Color(0.35f, 0.62f, 1f, 1f);
+    private readonly Color luckyCritColor = new Color(0.72f, 0.36f, 1f, 1f);
     private readonly Color hudTextColor = new Color(0.847f, 0.788f, 0.639f, 1f);
 
     private void Awake()
@@ -356,26 +359,64 @@ public class CombatPlaybackUI : MonoBehaviour
     private string BuildFloatingText(CombatSimulator.CombatPlaybackEvent playbackEvent)
     {
         if (playbackEvent.wasDodged)
-            return playbackEvent.wasCounter ? "COUNTER DODGE" : "DODGE";
+            return WrapFloatingTextColor(playbackEvent, playbackEvent.wasCounter ? "COUNTER DODGE" : "DODGE");
 
-        string text = "-" + playbackEvent.damage;
+        string text = playbackEvent.damage > 0 ? "-" + playbackEvent.damage : "0";
 
-        if (playbackEvent.wasCrit)
+        if (playbackEvent.wasLuckyCrit)
+            text += " LUCKY CRIT";
+        else if (playbackEvent.wasLucky)
+            text += " LUCKY";
+        else if (playbackEvent.wasCrit)
             text += " CRIT";
 
         if (playbackEvent.wasBlocked)
-            text += " BLOCK";
+            text = playbackEvent.damage > 0 ? text + " BLOCK" : "BLOCK";
 
         if (playbackEvent.wasCounter)
             text = "COUNTER " + text;
 
-        return text;
+        return WrapFloatingTextColor(playbackEvent, text);
+    }
+
+    private string WrapFloatingTextColor(CombatSimulator.CombatPlaybackEvent playbackEvent, string text)
+    {
+        if (playbackEvent == null || string.IsNullOrEmpty(text))
+            return text;
+
+        return "<color=#" + GetFloatingTextHexColor(playbackEvent) + ">" + text + "</color>";
+    }
+
+    private string GetFloatingTextHexColor(CombatSimulator.CombatPlaybackEvent playbackEvent)
+    {
+        if (playbackEvent.wasLuckyCrit)
+            return "B85CFF";
+
+        if (playbackEvent.wasLucky)
+            return "599EFF";
+
+        if (playbackEvent.wasCrit)
+            return "F22E1F";
+
+        if (playbackEvent.wasDodged)
+            return "8CB2F2";
+
+        if (playbackEvent.wasBlocked)
+            return "9EB8C2";
+
+        return "F5E3B3";
     }
 
     private Color GetFloatingTextColor(CombatSimulator.CombatPlaybackEvent playbackEvent)
     {
+        if (playbackEvent.wasLuckyCrit)
+            return luckyCritColor;
+
+        if (playbackEvent.wasLucky)
+            return luckyColor;
+
         if (playbackEvent.wasCrit)
-            return titleColor;
+            return critColor;
 
         if (playbackEvent.wasBlocked)
             return blockColor;
@@ -564,7 +605,7 @@ public class CombatPlaybackUI : MonoBehaviour
         floatingText.text = textValue;
         floatingText.color = color;
         floatingText.alpha = 1f;
-        floatingText.fontSize = textValue.Contains("CRIT") ? 44f : 38f;
+        floatingText.fontSize = IsHighImpactFloatingText(textValue) ? 44f : 38f;
 
         if (floatingTextRect == null)
             return;
@@ -604,7 +645,7 @@ public class CombatPlaybackUI : MonoBehaviour
         text.text = value;
         text.color = color;
         text.alpha = 1f;
-        text.fontSize = value.Contains("CRIT") ? 44f : 38f;
+        text.fontSize = IsHighImpactFloatingText(value) ? 44f : 38f;
 
         if (rect == null || target == null)
             return;
@@ -713,8 +754,14 @@ public class CombatPlaybackUI : MonoBehaviour
 
     private Color GetTargetFloatingTextColor(List<CombatSimulator.CombatPlaybackEvent> events, bool targetIsPlayer)
     {
+        if (HasTargetEvent(events, targetIsPlayer, e => e.wasLuckyCrit))
+            return luckyCritColor;
+
+        if (HasTargetEvent(events, targetIsPlayer, e => e.wasLucky))
+            return luckyColor;
+
         if (HasTargetEvent(events, targetIsPlayer, e => e.wasCrit))
-            return titleColor;
+            return critColor;
 
         if (HasTargetEvent(events, targetIsPlayer, e => e.wasDodged))
             return dodgeColor;
@@ -723,6 +770,14 @@ public class CombatPlaybackUI : MonoBehaviour
             return blockColor;
 
         return textColor;
+    }
+
+    private bool IsHighImpactFloatingText(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        return value.Contains("CRIT") || value.Contains("LUCKY");
     }
 
     private IEnumerator AnimateAttack(bool attackerIsPlayer)

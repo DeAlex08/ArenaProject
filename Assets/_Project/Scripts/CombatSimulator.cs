@@ -56,7 +56,12 @@ public static class CombatSimulator
         public int reaction;
         public int agility;
         public int armor;
+        public int armorHead;
+        public int armorBody;
+        public int armorArms;
+        public int armorLegs;
         public int luck;
+        public int block;
         public int combatPower;
         public float critChance;
         public CombatStance stance;
@@ -100,6 +105,8 @@ public static class CombatSimulator
         public bool wasBlocked;
         public bool wasDodged;
         public bool wasCrit;
+        public bool wasLucky;
+        public bool wasLuckyCrit;
         public bool wasCounter;
         public int playerHp;
         public int enemyHp;
@@ -125,6 +132,22 @@ public static class CombatSimulator
         public int attacks;
         public CombatBlockType blockType;
         public List<CombatBodyZone> blockedZones = new List<CombatBodyZone>();
+    }
+
+    private struct AttackResolution
+    {
+        public CombatBodyZone targetZone;
+        public int incomingDamage;
+        public int finalDamage;
+        public int reactionDamage;
+        public bool isCrit;
+        public bool isLucky;
+        public bool isLuckyCrit;
+        public bool isDodged;
+        public bool isBlocked;
+        public bool dodgeBypassed;
+        public bool blockCovered;
+        public bool reactionTriggered;
     }
 
     private static readonly CombatBodyZone[] BodyZones =
@@ -222,6 +245,44 @@ public static class CombatSimulator
         };
     }
 
+    public static void DebugSimulate100(FighterData playerData, FighterData enemyData)
+    {
+        const int fightCount = 100;
+        int wins = 0;
+        int losses = 0;
+        int draws = 0;
+        int totalRounds = 0;
+
+        for (int i = 0; i < fightCount; i++)
+        {
+            CombatResult result = Simulate(playerData, enemyData);
+            totalRounds += result.rounds;
+
+            switch (result.outcome)
+            {
+                case CombatOutcome.Victory:
+                    wins++;
+                    break;
+                case CombatOutcome.Defeat:
+                    losses++;
+                    break;
+                default:
+                    draws++;
+                    break;
+            }
+        }
+
+        Debug.Log(
+            "CombatSimulator Debug 100 fights | Wins: " +
+            wins +
+            ", Losses: " +
+            losses +
+            ", Draws: " +
+            draws +
+            ", Average Rounds: " +
+            (totalRounds / (float)fightCount).ToString("0.00"));
+    }
+
     private static FighterState CreateState(FighterData data, string fallbackName, bool isPlayer)
     {
         FighterData safeData = data ?? new FighterData();
@@ -229,7 +290,17 @@ public static class CombatSimulator
         safeData.maxHp = Mathf.Max(safeData.maxHp, 1);
         safeData.attack = Mathf.Max(safeData.attack, 1);
         safeData.defense = Mathf.Max(safeData.defense, 0);
+        safeData.rage = Mathf.Max(safeData.rage, 0);
+        safeData.reaction = Mathf.Max(safeData.reaction, 0);
+        safeData.agility = Mathf.Max(safeData.agility, 0);
+        safeData.armor = Mathf.Max(safeData.armor, 0);
+        safeData.luck = Mathf.Max(safeData.luck, 0);
         safeData.combatPower = Mathf.Max(safeData.combatPower, 1);
+
+        if (safeData.block <= 0 && safeData.blockType != CombatBlockType.None)
+            safeData.block = Mathf.Max(safeData.defense + Mathf.RoundToInt(safeData.reaction * 0.5f), 0);
+
+        safeData.block = Mathf.Max(safeData.block, 0);
 
         return new FighterState
         {
@@ -323,127 +394,253 @@ public static class CombatSimulator
         StringBuilder log,
         List<CombatPlaybackEvent> playbackEvents)
     {
-        CombatBodyZone targetZone = GetRandomBodyZone();
+        AttackResolution resolution = ResolveAttackCalculation(attacker, defender, defenderPlan);
         string attackLabel = isCounter ? "counterattacks" : "attacks";
 
-        if (RollDodge(defender.data))
+        if (resolution.isCrit)
+            attacker.crits++;
+
+        if (resolution.isDodged)
         {
             defender.dodges++;
 
-            log.AppendLine("[DODGE] " + attacker.data.fighterName + " " + attackLabel + " " + FormatZone(targetZone) + ", but " + defender.data.fighterName + " dodges.");
-            playbackEvents.Add(CreateDodgeEvent(attacker, defender, targetZone, round, isCounter));
-
-            if (!isCounter)
-                TryCounter(defender, attacker, round, log, playbackEvents);
-
+            log.AppendLine(
+                "[DODGE] " +
+                attacker.data.fighterName +
+                " " +
+                attackLabel +
+                " " +
+                defender.data.fighterName +
+                " in " +
+                FormatZone(resolution.targetZone) +
+                ", but " +
+                defender.data.fighterName +
+                " dodges." +
+                BuildLuckyLogSuffix(resolution));
+            playbackEvents.Add(CreateDodgeEvent(attacker, defender, resolution.targetZone, round, isCounter, resolution.isLucky, resolution.isLuckyCrit));
             return;
         }
 
-        bool isBlocked = IsZoneBlocked(defenderPlan, targetZone);
-        if (isBlocked)
+        if (resolution.isBlocked)
             defender.blocks++;
 
-        int damage = CalculateDamage(attacker.data, defender.data, defenderPlan.blockType, targetZone, isBlocked);
-        bool isCrit = RollCrit(attacker.data);
-
-        if (isCrit)
+        if (resolution.finalDamage > 0)
         {
-            damage = Mathf.Max(Mathf.RoundToInt(damage * 1.5f), damage + 1);
-            attacker.crits++;
+            defender.currentHp -= resolution.finalDamage;
+            attacker.damageDealt += resolution.finalDamage;
         }
 
-        defender.currentHp -= damage;
-        attacker.damageDealt += damage;
+        LogResolvedHit(log, attacker, defender, resolution, attackLabel, isCounter);
+        playbackEvents.Add(CreateHitEvent(
+            attacker,
+            defender,
+            resolution.targetZone,
+            round,
+            resolution.finalDamage,
+            resolution.isBlocked,
+            resolution.isCrit,
+            resolution.isLucky,
+            resolution.isLuckyCrit,
+            isCounter));
 
-        string blockText = isBlocked
-            ? " [BLOCK] Blocked with " + defenderPlan.blockType + "."
-            : "";
-        string critText = isCrit ? " [CRIT] Critical hit." : "";
+        if (!isCounter && resolution.reactionTriggered && resolution.reactionDamage > 0)
+        {
+            attacker.currentHp -= resolution.reactionDamage;
+            defender.damageDealt += resolution.reactionDamage;
+
+            log.AppendLine("[COUNTER] " + defender.data.fighterName + " retaliates for " + resolution.reactionDamage + " damage.");
+            playbackEvents.Add(CreateHitEvent(
+                defender,
+                attacker,
+                resolution.targetZone,
+                round,
+                resolution.reactionDamage,
+                false,
+                false,
+                false,
+                false,
+                true));
+        }
+    }
+
+    private static AttackResolution ResolveAttackCalculation(
+        FighterState attacker,
+        FighterState defender,
+        RoundPlan defenderPlan)
+    {
+        AttackResolution resolution = new AttackResolution
+        {
+            targetZone = GetRandomBodyZone()
+        };
+
+        float damage = attacker.data.attack * GetZoneDamageMultiplier(resolution.targetZone);
+
+        resolution.isCrit = RollCrit(attacker.data, defender.data);
+        resolution.isLucky = RollLucky(attacker.data, defender.data);
+        resolution.isLuckyCrit = resolution.isCrit && resolution.isLucky;
+
+        if (resolution.isCrit)
+            damage *= 1.5f;
+
+        resolution.incomingDamage = Mathf.Max(Mathf.RoundToInt(damage), 0);
+
+        if (resolution.isLucky)
+            resolution.dodgeBypassed = Random.value < 0.25f;
+
+        if (!resolution.dodgeBypassed && RollDodge(attacker.data, defender.data))
+        {
+            resolution.isDodged = true;
+            return resolution;
+        }
+
+        resolution.blockCovered = IsZoneBlocked(defenderPlan, resolution.targetZone);
+
+        if (!resolution.isLucky && resolution.blockCovered && RollBlock(defender.data))
+        {
+            resolution.isBlocked = true;
+            resolution.finalDamage = 0;
+        }
+        else
+        {
+            int effectiveArmor = GetZoneArmor(defender.data, resolution.targetZone) + defender.data.defense;
+            resolution.finalDamage = Mathf.Max(0, resolution.incomingDamage - effectiveArmor);
+        }
+
+        int reactionBaseDamage = resolution.isBlocked ? resolution.incomingDamage : resolution.finalDamage;
+        if (reactionBaseDamage > 0 && RollReaction(attacker.data, defender.data))
+        {
+            resolution.reactionTriggered = true;
+            resolution.reactionDamage = Mathf.Max(Mathf.RoundToInt(reactionBaseDamage * GetReactionDamagePercent(attacker.data, defender.data)), 0);
+        }
+
+        return resolution;
+    }
+
+    private static void LogResolvedHit(
+        StringBuilder log,
+        FighterState attacker,
+        FighterState defender,
+        AttackResolution resolution,
+        string attackLabel,
+        bool isCounter)
+    {
+        string prefix = isCounter ? "[COUNTER] " : "";
+        string blockText = resolution.isBlocked ? " [BLOCK] " + defender.data.fighterName + " blocks the attack." : "";
+        string armorText = !resolution.isBlocked && resolution.finalDamage <= 0 ? " Armor absorbs the blow." : "";
 
         log.AppendLine(
-            (isCounter ? "[COUNTER] " : "") +
+            prefix +
             attacker.data.fighterName +
             " " +
             attackLabel +
             " " +
-            FormatZone(targetZone) +
+            defender.data.fighterName +
+            " in " +
+            FormatZone(resolution.targetZone) +
             " for " +
-            damage +
+            resolution.finalDamage +
             " damage." +
+            BuildAttackQualityLog(resolution) +
             blockText +
-            critText);
-        playbackEvents.Add(CreateHitEvent(attacker, defender, targetZone, round, damage, isBlocked, isCrit, isCounter));
+            armorText);
 
-        if (isBlocked && !isCounter)
-            TryCounter(defender, attacker, round, log, playbackEvents);
+        if (resolution.isLucky && resolution.blockCovered)
+            log.AppendLine("[LUCKY] " + attacker.data.fighterName + " performs LUCKY HIT! Block bypassed.");
+
+        if (resolution.dodgeBypassed)
+            log.AppendLine("[LUCKY] " + attacker.data.fighterName + " bypasses the dodge attempt.");
     }
 
-    private static bool RollDodge(FighterData defender)
+    private static string BuildAttackQualityLog(AttackResolution resolution)
     {
-        float chance = Mathf.Clamp(4f + defender.agility * 0.18f, 4f, 35f);
-        return Random.Range(0f, 100f) < chance;
+        if (resolution.isLuckyCrit)
+            return " [LUCKY CRIT] Lucky critical hit.";
+
+        if (resolution.isCrit)
+            return " [CRIT] Critical hit.";
+
+        if (resolution.isLucky)
+            return " [LUCKY] Lucky hit.";
+
+        return "";
     }
 
-    private static bool RollCrit(FighterData attacker)
+    private static string BuildLuckyLogSuffix(AttackResolution resolution)
     {
-        float chance = attacker.critChance > 0f
-            ? attacker.critChance
-            : 5f + attacker.luck * 0.15f;
+        if (resolution.isLuckyCrit)
+            return " [LUCKY CRIT]";
 
-        chance = Mathf.Clamp(chance, 2f, 45f);
-        return Random.Range(0f, 100f) < chance;
+        if (resolution.isLucky)
+            return " [LUCKY]";
+
+        return "";
     }
 
-    private static void TryCounter(
-        FighterState counterAttacker,
-        FighterState originalAttacker,
-        int round,
-        StringBuilder log,
-        List<CombatPlaybackEvent> playbackEvents)
+    private static bool RollDodge(FighterData attacker, FighterData defender)
     {
-        if (counterAttacker.IsDead || originalAttacker.IsDead)
-            return;
-
-        float chance = Mathf.Clamp(6f + counterAttacker.data.reaction * 0.22f, 6f, 40f);
-
-        if (Random.Range(0f, 100f) >= chance)
-            return;
-
-        log.AppendLine("[COUNTER] " + counterAttacker.data.fighterName + " finds an opening for a counterattack.");
-        ResolveAttack(counterAttacker, originalAttacker, new RoundPlan(), round, true, log, playbackEvents);
+        float effectiveAgility = Mathf.Max(0f, defender.agility - attacker.agility * 0.6f);
+        return Random.value < RatioChance(effectiveAgility, 100f);
     }
 
-    private static int CalculateDamage(
-        FighterData attacker,
-        FighterData defender,
-        CombatBlockType activeBlockType,
-        CombatBodyZone targetZone,
-        bool isBlocked)
+    private static bool RollCrit(FighterData attacker, FighterData defender)
     {
-        float baseDamage =
-            attacker.attack +
-            attacker.strength * 1.35f +
-            attacker.rage * 0.9f +
-            attacker.combatPower * 0.018f;
-
-        float zoneMultiplier = GetZoneDamageMultiplier(targetZone);
-        float mitigation = Mathf.Clamp01((defender.defense + defender.armor * 0.75f) / 260f);
-        float blockMultiplier = isBlocked ? GetBlockDamageMultiplier(activeBlockType) : 1f;
-
-        float finalDamage = baseDamage * zoneMultiplier * (1f - mitigation) * blockMultiplier;
-        return Mathf.Max(Mathf.RoundToInt(finalDamage), 1);
+        float effectiveRage = Mathf.Max(0f, attacker.rage - defender.rage * 0.6f);
+        return Random.value < RatioChance(effectiveRage, 100f);
     }
 
-    private static float GetBlockDamageMultiplier(CombatBlockType blockType)
+    private static bool RollLucky(FighterData attacker, FighterData defender)
     {
-        switch (blockType)
+        float effectiveLuck = Mathf.Max(0f, attacker.luck - defender.luck * 0.6f);
+        return Random.value < RatioChance(effectiveLuck, 100f);
+    }
+
+    private static bool RollBlock(FighterData defender)
+    {
+        return Random.value < RatioChance(defender.block, 150f);
+    }
+
+    private static bool RollReaction(FighterData attacker, FighterData defender)
+    {
+        float effectiveReaction = Mathf.Max(0f, defender.reaction - attacker.reaction * 0.6f);
+        return Random.value < RatioChance(effectiveReaction, 100f);
+    }
+
+    private static float GetReactionDamagePercent(FighterData attacker, FighterData defender)
+    {
+        float effectiveReaction = Mathf.Max(0f, defender.reaction - attacker.reaction * 0.6f);
+        return RatioChance(effectiveReaction, 200f);
+    }
+
+    private static float RatioChance(float value, float denominatorOffset)
+    {
+        if (value <= 0f)
+            return 0f;
+
+        return value / (value + denominatorOffset);
+    }
+
+    private static int GetZoneArmor(FighterData defender, CombatBodyZone targetZone)
+    {
+        bool hasZoneArmor =
+            defender.armorHead > 0 ||
+            defender.armorBody > 0 ||
+            defender.armorArms > 0 ||
+            defender.armorLegs > 0;
+
+        if (!hasZoneArmor)
+            return Mathf.Max(defender.armor, 0);
+
+        switch (targetZone)
         {
-            case CombatBlockType.Shield:
-                return 0.2f;
-            case CombatBlockType.Weapon:
-                return 0.5f;
+            case CombatBodyZone.Head:
+                return Mathf.Max(defender.armorHead, 0);
+            case CombatBodyZone.LeftArm:
+            case CombatBodyZone.RightArm:
+                return Mathf.Max(defender.armorArms, 0);
+            case CombatBodyZone.Legs:
+                return Mathf.Max(defender.armorLegs, 0);
             default:
-                return 1f;
+                return Mathf.Max(defender.armorBody, 0);
         }
     }
 
@@ -452,12 +649,12 @@ public static class CombatSimulator
         switch (zone)
         {
             case CombatBodyZone.Head:
-                return 1.22f;
+                return 1.25f;
             case CombatBodyZone.LeftArm:
             case CombatBodyZone.RightArm:
-                return 0.9f;
+                return 0.85f;
             case CombatBodyZone.Legs:
-                return 0.96f;
+                return 0.90f;
             default:
                 return 1f;
         }
@@ -472,7 +669,21 @@ public static class CombatSimulator
 
     private static CombatBodyZone GetRandomBodyZone()
     {
-        return BodyZones[Random.Range(0, BodyZones.Length)];
+        float roll = Random.value;
+
+        if (roll < 0.45f)
+            return CombatBodyZone.Body;
+
+        if (roll < 0.55f)
+            return CombatBodyZone.LeftArm;
+
+        if (roll < 0.65f)
+            return CombatBodyZone.RightArm;
+
+        if (roll < 0.85f)
+            return CombatBodyZone.Legs;
+
+        return CombatBodyZone.Head;
     }
 
     private static CombatPlaybackEvent CreateRoundEvent(
@@ -497,7 +708,9 @@ public static class CombatSimulator
         FighterState defender,
         CombatBodyZone targetZone,
         int round,
-        bool isCounter)
+        bool isCounter,
+        bool isLucky,
+        bool isLuckyCrit)
     {
         return new CombatPlaybackEvent
         {
@@ -509,6 +722,8 @@ public static class CombatSimulator
             targetName = defender.data.fighterName,
             targetZone = FormatZone(targetZone),
             wasDodged = true,
+            wasLucky = isLucky,
+            wasLuckyCrit = isLuckyCrit,
             wasCounter = isCounter,
             playerHp = GetPlayerHp(attacker, defender),
             enemyHp = GetEnemyHp(attacker, defender),
@@ -524,6 +739,8 @@ public static class CombatSimulator
         int damage,
         bool isBlocked,
         bool isCrit,
+        bool isLucky,
+        bool isLuckyCrit,
         bool isCounter)
     {
         return new CombatPlaybackEvent
@@ -538,6 +755,8 @@ public static class CombatSimulator
             damage = damage,
             wasBlocked = isBlocked,
             wasCrit = isCrit,
+            wasLucky = isLucky,
+            wasLuckyCrit = isLuckyCrit,
             wasCounter = isCounter,
             playerHp = GetPlayerHp(attacker, defender),
             enemyHp = GetEnemyHp(attacker, defender),
@@ -595,7 +814,7 @@ public static class CombatSimulator
             fighterName +
             ": " +
             plan.attacks +
-            " attack(s), blocks " +
+            " attack(s), guards " +
             FormatZones(plan.blockedZones) +
             " with " +
             plan.blockType +

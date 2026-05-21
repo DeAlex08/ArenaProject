@@ -24,7 +24,7 @@ MonoBehaviour:
   strength: 4
   rage: 4
   reaction: 4
-  agility: 4
+  agility: 500
   endurance: 4
   luck: 4
   intelligence: 4
