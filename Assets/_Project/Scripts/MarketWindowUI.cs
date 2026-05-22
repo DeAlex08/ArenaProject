@@ -39,8 +39,21 @@ public class MarketWindowUI : MonoBehaviour
     [Header("Shop")]
     [SerializeField] private List<ShopEntry> shopEntries = new List<ShopEntry>();
 
-    private TMP_Text tokensText;
-    private TMP_Text messageText;
+    [Header("Editable UI")]
+    [SerializeField] private bool useEditableUi = true;
+    [SerializeField] private Image marketBackground;
+    [SerializeField] private Button closeButton;
+    [SerializeField] private TMP_Text titleText;
+    [SerializeField] private TMP_Text tokensText;
+    [SerializeField] private TMP_Text messageText;
+    [SerializeField] private MarketModeButtonUI buyModeButton;
+    [SerializeField] private MarketModeButtonUI sellModeButton;
+    [SerializeField] private RectTransform categoryButtonContainer;
+    [SerializeField] private MarketCategoryButtonUI categoryButtonPrefab;
+    [SerializeField] private List<MarketCategoryButtonUI> categoryButtonViews = new List<MarketCategoryButtonUI>();
+    [SerializeField] private RectTransform itemCardContainer;
+    [SerializeField] private MarketItemCardUI itemCardPrefab;
+
     private TMP_Text buyModeText;
     private TMP_Text sellModeText;
     private Image buyModeBackground;
@@ -168,7 +181,9 @@ public class MarketWindowUI : MonoBehaviour
         LoadVisualAssets();
         EnsureDefaultShopEntries();
 
-        if (!isBuilt)
+        if (HasEditableUi())
+            WireEditableWindow();
+        else if (!isBuilt)
             BuildWindow();
 
         RefreshAll();
@@ -191,7 +206,7 @@ public class MarketWindowUI : MonoBehaviour
         if (background == null)
             background = gameObject.AddComponent<Image>();
 
-        ApplySpriteImage(background, marketFrameSprite, Color.white, BackgroundColor);
+        ApplySpriteImage(background, marketFrameSprite, Color.white, BackgroundColor, true);
         background.raycastTarget = true;
 
         RectTransform root = GetComponent<RectTransform>();
@@ -213,6 +228,105 @@ public class MarketWindowUI : MonoBehaviour
         CreateItemsPanel(root);
 
         isBuilt = true;
+    }
+
+    private bool HasEditableUi()
+    {
+        return useEditableUi &&
+            itemCardContainer &&
+            itemCardPrefab &&
+            buyModeButton &&
+            sellModeButton;
+    }
+
+    private void WireEditableWindow()
+    {
+        content = itemCardContainer;
+        categoryButtons.Clear();
+
+        if (!marketBackground)
+            marketBackground = GetComponent<Image>();
+
+        if (marketBackground && marketBackground.sprite == null)
+            ApplySpriteImage(marketBackground, marketFrameSprite, Color.white, BackgroundColor, true);
+
+        if (titleText)
+            titleText.text = "MARKET";
+
+        if (closeButton)
+        {
+            closeButton.onClick.RemoveListener(Close);
+            closeButton.onClick.AddListener(Close);
+        }
+
+        if (!buyModeButton || !sellModeButton)
+            return;
+
+        buyModeButton.Initialize("BUY");
+        sellModeButton.Initialize("SELL");
+        buyModeBackground = buyModeButton.Background;
+        buyModeText = buyModeButton.Label;
+        sellModeBackground = sellModeButton.Background;
+        sellModeText = sellModeButton.Label;
+
+        if (buyModeButton.Button)
+        {
+            buyModeButton.Button.onClick.RemoveAllListeners();
+            buyModeButton.Button.onClick.AddListener(() => SelectMode(MarketMode.Buy));
+        }
+
+        if (sellModeButton.Button)
+        {
+            sellModeButton.Button.onClick.RemoveAllListeners();
+            sellModeButton.Button.onClick.AddListener(() => SelectMode(MarketMode.Sell));
+        }
+
+        EnsureEditableCategoryButtons();
+
+        foreach (MarketCategoryButtonUI categoryButton in categoryButtonViews)
+        {
+            if (!categoryButton)
+                continue;
+
+            categoryButton.Initialize(categoryButton.ItemType, GetCategoryLabel(categoryButton.ItemType));
+            categoryButtons.Add(new CategoryButtonBinding
+            {
+                itemType = categoryButton.ItemType,
+                background = categoryButton.Background,
+                label = categoryButton.Label
+            });
+
+            if (categoryButton.Button)
+            {
+                ItemType capturedType = categoryButton.ItemType;
+                categoryButton.Button.onClick.RemoveAllListeners();
+                categoryButton.Button.onClick.AddListener(() => SelectCategory(capturedType));
+            }
+        }
+
+        isBuilt = true;
+    }
+
+    private void EnsureEditableCategoryButtons()
+    {
+        if (!categoryButtonContainer)
+            return;
+
+        categoryButtonViews.RemoveAll(button => button == null);
+
+        if (categoryButtonViews.Count == 0)
+            categoryButtonViews.AddRange(categoryButtonContainer.GetComponentsInChildren<MarketCategoryButtonUI>(true));
+
+        if (categoryButtonViews.Count > 0 || !categoryButtonPrefab)
+            return;
+
+        foreach (ItemType itemType in categoryOrder)
+        {
+            MarketCategoryButtonUI button = Instantiate(categoryButtonPrefab, categoryButtonContainer);
+            button.gameObject.name = "CategoryButton_" + itemType;
+            button.Initialize(itemType, GetCategoryLabel(itemType));
+            categoryButtonViews.Add(button);
+        }
     }
 
     private void CreateModeToggle(RectTransform root)
@@ -354,7 +468,7 @@ public class MarketWindowUI : MonoBehaviour
 
     private void RefreshItemCards()
     {
-        if (content == null)
+        if (!content)
             return;
 
         ClearChildren(content);
@@ -426,9 +540,26 @@ public class MarketWindowUI : MonoBehaviour
 
     private void CreateMarketCard(ItemData item, int price, string actionText, bool canClick, UnityEngine.Events.UnityAction action)
     {
+        if (itemCardPrefab && content)
+        {
+            MarketItemCardUI cardView = Instantiate(itemCardPrefab, content);
+            cardView.gameObject.name = "MarketCard_" + ItemDatabase.GetStableItemId(item);
+
+            cardView.Bind(
+                item,
+                GetRarityLabel(item.rarity) + "  |  " + GetSlotLabel(item.itemType) + "  |  LVL " + Mathf.Max(item.requiredLevel, 1),
+                BuildStatsText(item),
+                price,
+                actionText,
+                canClick,
+                action,
+                GetRarityColor(item.rarity));
+            return;
+        }
+
         RectTransform card = CreatePanel("MarketCard_" + ItemDatabase.GetStableItemId(item), content, Vector2.zero, new Vector2(930f, 236f), CardColor);
         Image cardImage = card.GetComponent<Image>();
-        ApplySpriteImage(cardImage, itemCardFrameSprite, Color.white, CardColor);
+        ApplySpriteImage(cardImage, itemCardFrameSprite, Color.white, CardColor, true);
 
         if (itemCardFrameSprite == null)
             AddFrame(card.gameObject, GetRarityColor(item.rarity), new Vector2(2f, -2f));
@@ -439,14 +570,14 @@ public class MarketWindowUI : MonoBehaviour
         layoutElement.minHeight = 236f;
         layoutElement.preferredHeight = 236f;
 
-        CreateIcon(card, item.icon, new Vector2(-360f, 10f), new Vector2(118f, 118f));
+        CreateIcon(card, item.icon, new Vector2(-350f, 4f), new Vector2(150f, 150f));
 
-        TMP_Text itemName = CreateText("ItemName", card, item.itemName, new Vector2(-155f, 78f), new Vector2(390f, 38f), 24, GetRarityColor(item.rarity), TextAlignmentOptions.Left);
+        TMP_Text itemName = CreateText("ItemName", card, item.itemName, new Vector2(-70f, 78f), new Vector2(520f, 38f), 24, GetRarityColor(item.rarity), TextAlignmentOptions.Center);
         itemName.fontStyle = FontStyles.Bold;
 
-        CreateText("Meta", card, GetRarityLabel(item.rarity) + "  |  " + GetSlotLabel(item.itemType) + "  |  LVL " + Mathf.Max(item.requiredLevel, 1), new Vector2(-155f, 42f), new Vector2(390f, 30f), 17, MutedTextColor, TextAlignmentOptions.Left);
+        CreateText("Meta", card, GetRarityLabel(item.rarity) + "  |  " + GetSlotLabel(item.itemType) + "  |  LVL " + Mathf.Max(item.requiredLevel, 1), new Vector2(-70f, 42f), new Vector2(520f, 30f), 17, MutedTextColor, TextAlignmentOptions.Center);
 
-        TMP_Text stats = CreateText("Stats", card, BuildStatsText(item), new Vector2(65f, -25f), new Vector2(450f, 118f), 18, TextColor, TextAlignmentOptions.Left);
+        TMP_Text stats = CreateText("Stats", card, BuildStatsText(item), new Vector2(-35f, -35f), new Vector2(490f, 112f), 18, TextColor, TextAlignmentOptions.Left);
         stats.textWrappingMode = TextWrappingModes.Normal;
         stats.lineSpacing = -10f;
 
@@ -591,13 +722,13 @@ public class MarketWindowUI : MonoBehaviour
 
     private void RefreshTokens()
     {
-        if (tokensText != null)
+        if (tokensText)
             tokensText.text = "Arena Tokens: " + (playerStats != null ? playerStats.arenaTokens : 0);
     }
 
     private void SetMessage(string message)
     {
-        if (messageText != null)
+        if (messageText)
             messageText.text = message;
     }
 
@@ -605,16 +736,12 @@ public class MarketWindowUI : MonoBehaviour
     {
         List<string> parts = new List<string>();
 
-        if (item.itemType == ItemType.Weapon && item.strength > 0)
-            AddStat(parts, "Attack", item.strength);
-
         if (item.minDamage > 0 || item.maxDamage > 0)
             parts.Add("Damage " + item.minDamage + "-" + item.maxDamage);
 
         AddStat(parts, GetArmorStatLabel(item.itemType), item.armor);
 
-        if (item.itemType != ItemType.Weapon)
-            AddStat(parts, "Strength", item.strength);
+        AddStat(parts, "Strength", item.strength);
 
         AddStat(parts, "Rage", item.rage);
         AddStat(parts, "Reaction", item.reaction);
@@ -775,7 +902,7 @@ public class MarketWindowUI : MonoBehaviour
     {
         RectTransform buttonRect = CreatePanel(objectName, parent, anchoredPosition, size, ButtonColor);
         Image buttonImage = buttonRect.GetComponent<Image>();
-        ApplySpriteImage(buttonImage, marketFrameSprite, Color.white, ButtonColor);
+        ApplySpriteImage(buttonImage, marketFrameSprite, Color.white, ButtonColor, true);
 
         if (marketFrameSprite == null)
             AddFrame(buttonRect.gameObject, BorderColor, new Vector2(2f, -2f));
@@ -825,7 +952,7 @@ public class MarketWindowUI : MonoBehaviour
         goldOutline.useGraphicAlpha = true;
     }
 
-    private void ApplySpriteImage(Image image, Sprite sprite, Color spriteColor, Color fallbackColor)
+    private void ApplySpriteImage(Image image, Sprite sprite, Color spriteColor, Color fallbackColor, bool sliced)
     {
         if (image == null)
             return;
@@ -833,13 +960,14 @@ public class MarketWindowUI : MonoBehaviour
         if (sprite != null)
         {
             image.sprite = sprite;
-            image.type = Image.Type.Simple;
+            image.type = sliced ? Image.Type.Sliced : Image.Type.Simple;
             image.preserveAspect = false;
             image.color = spriteColor;
         }
         else
         {
             image.sprite = null;
+            image.type = Image.Type.Simple;
             image.color = fallbackColor;
         }
     }
@@ -877,29 +1005,27 @@ public class MarketWindowUI : MonoBehaviour
     private void LoadVisualAssets()
     {
         if (marketFrameSprite == null)
-            marketFrameSprite = LoadSpriteResource("Market/MarketFrame");
+            marketFrameSprite = LoadSpriteResource("Market/MarketFrame", new Vector4(86f, 86f, 86f, 86f));
 
         if (itemCardFrameSprite == null)
-            itemCardFrameSprite = LoadSpriteResource("Market/MarketItemCardFrame");
+            itemCardFrameSprite = LoadSpriteResource("Market/MarketItemCardFrame", new Vector4(78f, 78f, 78f, 78f));
     }
 
-    private Sprite LoadSpriteResource(string resourcePath)
+    private Sprite LoadSpriteResource(string resourcePath, Vector4 border)
     {
-        Sprite sprite = Resources.Load<Sprite>(resourcePath);
-
-        if (sprite != null)
-            return sprite;
-
         Texture2D texture = Resources.Load<Texture2D>(resourcePath);
 
         if (texture == null)
-            return null;
+            return Resources.Load<Sprite>(resourcePath);
 
         return Sprite.Create(
             texture,
             new Rect(0f, 0f, texture.width, texture.height),
             new Vector2(0.5f, 0.5f),
-            100f);
+            100f,
+            0,
+            SpriteMeshType.FullRect,
+            border);
     }
 
     private void EnsureDefaultShopEntries()

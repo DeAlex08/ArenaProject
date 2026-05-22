@@ -18,8 +18,8 @@ MonoBehaviour:
   rarity: 0
   icon: {fileID: -1773126822603289218, guid: b8b67dc0675d84239a59388199325452, type: 3}
   requiredLevel: 1
-  minDamage: 0
-  maxDamage: 0
+  minDamage: 8
+  maxDamage: 12
   armor: 0
   strength: 8
   rage: 0

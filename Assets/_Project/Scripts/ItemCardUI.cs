@@ -89,7 +89,7 @@ public class ItemCardUI : MonoBehaviour
         }
 
         if (item.itemType == ItemType.Weapon && item.strength > 0)
-            stats.AppendLine("Атака: " + item.strength);
+            stats.AppendLine("Сила: " + item.strength);
 
         if (item.armor > 0) stats.AppendLine(GetArmorStatText(item.itemType) + ": " + item.armor);
         if (item.itemType != ItemType.Weapon && item.strength > 0) stats.AppendLine("Сила: " + item.strength);
