@@ -12,6 +12,28 @@ public class ArenaWindowUI : MonoBehaviour
         Hard
     }
 
+    private enum ArenaEnemyArchetype
+    {
+        Berserker,
+        Gambler,
+        Duelist
+    }
+
+    private struct EnemyStatBlock
+    {
+        public int strength;
+        public int rage;
+        public int reaction;
+        public int agility;
+        public int endurance;
+        public int armor;
+        public int luck;
+        public int intelligence;
+        public int combatPower;
+        public int hp;
+        public int attack;
+    }
+
     private struct ArenaFightResult
     {
         public CombatOutcome outcome;
@@ -47,12 +69,17 @@ public class ArenaWindowUI : MonoBehaviour
         public int hp = 500;
         public int attack = 80;
         public int defense = 30;
+        public int strength = 10;
+        public int rage = 5;
+        public int luck = 5;
+        public int endurance = 10;
         public int armor = 30;
         public int agility = 10;
         public int reaction = 10;
         public float critChance = 5f;
         public int baseExpReward = 25;
         public int tokenReward = 10;
+        public string gearSummary = "Tier 1 common gear style";
         [TextArea(2, 4)] public string description = "A hungry arena challenger looking for glory.";
     }
 
@@ -729,14 +756,14 @@ public class ArenaWindowUI : MonoBehaviour
         infoLevelText.text = "Level: " + enemy.level;
         infoPowerText.text = "Combat Power: " + enemy.combatPower;
         infoHpText.text = "HP: " + enemy.hp;
-        infoAttackText.text = "Attack: " + enemy.attack;
-        infoDefenseText.text = "Defense / Armor: " + enemy.defense + " / " + enemy.armor;
+        infoAttackText.text = "Attack / Strength: " + enemy.attack + " / " + enemy.strength;
+        infoDefenseText.text = "Armor / Endurance: " + enemy.armor + " / " + enemy.endurance;
         infoAgilityText.text = "Agility: " + enemy.agility;
         infoReactionText.text = "Reaction: " + enemy.reaction;
-        infoCritText.text = "Crit Chance: " + enemy.critChance.ToString("0.#") + "%";
+        infoCritText.text = "Rage / Luck / Crit: " + enemy.rage + " / " + enemy.luck + " / " + enemy.critChance.ToString("0.#") + "%";
         infoExpText.text = "EXP Reward: " + expReward;
         infoTokenText.text = "Arena Tokens: " + enemy.tokenReward;
-        infoDescriptionText.text = enemy.description;
+        infoDescriptionText.text = enemy.gearSummary + ". " + enemy.description;
 
         infoFightButton.onClick.RemoveAllListeners();
         infoFightButton.onClick.AddListener(() => FightEnemy(selectedEnemyIndex));
@@ -1107,11 +1134,17 @@ public class ArenaWindowUI : MonoBehaviour
                 level = 1,
                 maxHp = Mathf.Max(playerPower / 5, 100),
                 attack = Mathf.Max(playerPower / 45, 20),
-                defense = Mathf.Max(playerPower / 90, 5),
+                defense = 0,
+                strength = 10,
+                rage = 5,
+                reaction = 10,
+                agility = 10,
+                armor = Mathf.Max(playerPower / 90, 5),
                 armorHead = Mathf.Max(playerPower / 90, 5),
                 armorBody = Mathf.Max(playerPower / 90, 5),
                 armorArms = Mathf.Max(playerPower / 90, 5),
                 armorLegs = Mathf.Max(playerPower / 90, 5),
+                luck = 5,
                 block = Mathf.Max(playerPower / 110, 5),
                 combatPower = playerPower,
                 critChance = 5f,
@@ -1126,7 +1159,7 @@ public class ArenaWindowUI : MonoBehaviour
             level = playerStats.level,
             maxHp = Mathf.Max(playerStats.maxHp, 1),
             attack = Mathf.Max(playerStats.strength * 2 + playerStats.rage + playerStats.combatPower / 70, 1),
-            defense = Mathf.Max(playerStats.armor, 0),
+            defense = 0,
             strength = playerStats.strength,
             rage = playerStats.rage,
             reaction = playerStats.reaction,
@@ -1153,9 +1186,9 @@ public class ArenaWindowUI : MonoBehaviour
             level = enemy.level,
             maxHp = Mathf.Max(enemy.hp, 1),
             attack = Mathf.Max(enemy.attack, 1),
-            defense = Mathf.Max(enemy.defense, 0),
-            strength = Mathf.Max(enemy.attack / 4, 1),
-            rage = Mathf.Max(enemy.attack / 8, 1),
+            defense = 0,
+            strength = Mathf.Max(enemy.strength, 1),
+            rage = Mathf.Max(enemy.rage, 0),
             reaction = Mathf.Max(enemy.reaction, 1),
             agility = Mathf.Max(enemy.agility, 1),
             armor = Mathf.Max(enemy.armor, 0),
@@ -1163,8 +1196,8 @@ public class ArenaWindowUI : MonoBehaviour
             armorBody = Mathf.Max(enemy.armor, 0),
             armorArms = Mathf.Max(enemy.armor, 0),
             armorLegs = Mathf.Max(enemy.armor, 0),
-            luck = Mathf.Max(Mathf.RoundToInt(enemy.critChance), 1),
-            block = Mathf.Max(enemy.defense + Mathf.RoundToInt(enemy.reaction * 0.5f), 0),
+            luck = Mathf.Max(enemy.luck, 0),
+            block = Mathf.Max(enemy.armor + Mathf.RoundToInt(enemy.reaction * 0.5f), 0),
             combatPower = Mathf.Max(enemy.combatPower, 1),
             critChance = Mathf.Max(enemy.critChance, 2f),
             stance = GetEnemyStance(enemy),
@@ -1174,10 +1207,10 @@ public class ArenaWindowUI : MonoBehaviour
 
     private CombatStance GetEnemyStance(ArenaEnemyData enemy)
     {
-        if (enemy.combatPower >= GetPlayerPower() * 1.2f)
+        if (enemy.armor + enemy.endurance > enemy.strength + enemy.rage + enemy.luck)
             return CombatStance.Defensive;
 
-        if (enemy.attack > enemy.defense * 2)
+        if (enemy.strength + enemy.rage >= enemy.agility + enemy.reaction)
             return CombatStance.Aggressive;
 
         return CombatStance.Standard;
@@ -1226,113 +1259,290 @@ public class ArenaWindowUI : MonoBehaviour
 
     private void GenerateEnemies()
     {
-        int playerPower = GetPlayerPower();
         int playerLevel = GetPlayerLevel();
 
         enemies = new[]
         {
-            GenerateEnemy(ArenaEnemyDifficulty.Easy, playerPower, playerLevel),
-            GenerateEnemy(ArenaEnemyDifficulty.Balanced, playerPower, playerLevel),
-            GenerateEnemy(ArenaEnemyDifficulty.Hard, playerPower, playerLevel)
+            GenerateEnemy(ArenaEnemyDifficulty.Easy, playerLevel),
+            GenerateEnemy(ArenaEnemyDifficulty.Balanced, playerLevel),
+            GenerateEnemy(ArenaEnemyDifficulty.Hard, playerLevel)
         };
     }
 
-    private ArenaEnemyData GenerateEnemy(ArenaEnemyDifficulty difficulty, int playerPower, int playerLevel)
+    private ArenaEnemyData GenerateEnemy(ArenaEnemyDifficulty difficulty, int playerLevel)
     {
-        float minPowerMultiplier;
-        float maxPowerMultiplier;
         int minLevelOffset;
         int maxLevelOffset;
         float expScale;
-        float tokenScale;
+        float statScaleMin;
+        float statScaleMax;
         string[] names;
 
         switch (difficulty)
         {
             case ArenaEnemyDifficulty.Easy:
-                minPowerMultiplier = 0.70f;
-                maxPowerMultiplier = 0.85f;
                 minLevelOffset = -1;
                 maxLevelOffset = 0;
                 expScale = 0.72f;
-                tokenScale = 0.62f;
+                statScaleMin = 0.62f;
+                statScaleMax = 0.72f;
                 names = new[] { "Grave Cutthroat", "Ash Squire", "Pit Wanderer", "Bone Initiate" };
                 break;
 
             case ArenaEnemyDifficulty.Hard:
-                minPowerMultiplier = 1.20f;
-                maxPowerMultiplier = 1.45f;
                 minLevelOffset = 1;
                 maxLevelOffset = 3;
                 expScale = 1.42f;
-                tokenScale = 1.55f;
+                statScaleMin = 1.08f;
+                statScaleMax = 1.18f;
                 names = new[] { "Blood Champion", "Blackguard Warden", "Dread Executioner", "Crownless Butcher" };
                 break;
 
             default:
-                minPowerMultiplier = 0.95f;
-                maxPowerMultiplier = 1.10f;
                 minLevelOffset = 0;
                 maxLevelOffset = 1;
                 expScale = 1f;
-                tokenScale = 1f;
+                statScaleMin = 0.94f;
+                statScaleMax = 1.04f;
                 names = new[] { "Arena Duelist", "Iron Reaver", "Oathbound Knight", "Veil Hunter" };
                 break;
         }
 
         int level = Mathf.Max(playerLevel + Random.Range(minLevelOffset, maxLevelOffset + 1), 1);
-        int combatPower = Mathf.Max(Mathf.RoundToInt(playerPower * Random.Range(minPowerMultiplier, maxPowerMultiplier)), 100);
-        int hp = Mathf.Max(Mathf.RoundToInt(combatPower * Random.Range(0.32f, 0.46f)), 120);
-        int attack = Mathf.Max(Mathf.RoundToInt(combatPower * Random.Range(0.040f, 0.062f)), 15);
-        int defense = Mathf.Max(Mathf.RoundToInt(combatPower * Random.Range(0.014f, 0.025f)), 2);
-        int armor = Mathf.Max(Mathf.RoundToInt(defense * Random.Range(0.9f, 1.25f)), 0);
-        int agility = Mathf.Max(level + Mathf.RoundToInt(combatPower / Random.Range(300f, 380f)), 1);
-        int reaction = Mathf.Max(level + Mathf.RoundToInt(combatPower / Random.Range(260f, 340f)), 1);
-        float critChance = BuildEnemyCritChance(difficulty);
-        int baseExp = Mathf.Max(Mathf.RoundToInt((level * 4f + combatPower * 0.008f) * expScale), 8);
-        int tokens = Mathf.Max(Mathf.RoundToInt((level * 0.8f + combatPower * 0.002f) * tokenScale), 1);
+        ArenaEnemyArchetype archetype = PickEnemyArchetype();
+        ItemRarity gearRarity = PickEnemyGearRarity(difficulty);
+        float statScale = Random.Range(statScaleMin, statScaleMax);
+        EnemyStatBlock stats = BuildEnemyStats(level, archetype, gearRarity, statScale);
+        float critChance = CalculateCritChance(stats.rage, stats.luck);
+        int baseExp = Mathf.Max(Mathf.RoundToInt((level * 6f + stats.combatPower * 0.010f) * expScale), 10);
+        int tokens = CalculateTokenReward(difficulty, level, stats.combatPower);
 
         return new ArenaEnemyData
         {
             enemyName = names[Random.Range(0, names.Length)],
             level = level,
-            combatPower = combatPower,
-            hp = hp,
-            attack = attack,
-            defense = defense,
-            armor = armor,
-            agility = agility,
-            reaction = reaction,
+            combatPower = stats.combatPower,
+            hp = stats.hp,
+            attack = stats.attack,
+            defense = 0,
+            strength = stats.strength,
+            rage = stats.rage,
+            luck = stats.luck,
+            endurance = stats.endurance,
+            armor = stats.armor,
+            agility = stats.agility,
+            reaction = stats.reaction,
             critChance = critChance,
             baseExpReward = baseExp,
             tokenReward = tokens,
-            description = BuildEnemyDescription(difficulty)
+            gearSummary = BuildEnemyGearSummary(archetype, gearRarity),
+            description = BuildEnemyDescription(difficulty, archetype)
         };
     }
 
-    private float BuildEnemyCritChance(ArenaEnemyDifficulty difficulty)
+    private ArenaEnemyArchetype PickEnemyArchetype()
+    {
+        return (ArenaEnemyArchetype)Random.Range(0, 3);
+    }
+
+    private ItemRarity PickEnemyGearRarity(ArenaEnemyDifficulty difficulty)
     {
         switch (difficulty)
         {
             case ArenaEnemyDifficulty.Easy:
-                return Random.Range(4f, 7.5f);
+                return ItemRarity.Common;
             case ArenaEnemyDifficulty.Hard:
-                return Random.Range(8.5f, 14.5f);
+                return Random.value < 0.35f ? ItemRarity.Epic : ItemRarity.Rare;
             default:
-                return Random.Range(6f, 10.5f);
+                return Random.value < 0.45f ? ItemRarity.Rare : ItemRarity.Common;
         }
     }
 
-    private string BuildEnemyDescription(ArenaEnemyDifficulty difficulty)
+    private EnemyStatBlock BuildEnemyStats(int level, ArenaEnemyArchetype archetype, ItemRarity gearRarity, float statScale)
     {
+        int levelBonus = Mathf.Max(level - 1, 0);
+
+        EnemyStatBlock stats = new EnemyStatBlock
+        {
+            strength = 10 + levelBonus * 2,
+            rage = 5 + levelBonus,
+            reaction = 10 + levelBonus,
+            agility = 10 + levelBonus,
+            endurance = 10 + levelBonus * 2,
+            armor = levelBonus,
+            luck = 5 + levelBonus,
+            intelligence = 10 + levelBonus
+        };
+
+        ApplyTierOneEnemyGear(ref stats, archetype, gearRarity);
+        ScaleEnemyStats(ref stats, statScale);
+
+        stats.hp = CalculateHpFromEndurance(stats.endurance);
+        stats.combatPower = CalculateCombatPower(
+            level,
+            stats.strength,
+            stats.rage,
+            stats.reaction,
+            stats.agility,
+            stats.endurance,
+            stats.armor,
+            stats.luck,
+            stats.intelligence);
+        stats.attack = CalculateAttack(stats.strength, stats.rage, stats.combatPower);
+
+        return stats;
+    }
+
+    private void ApplyTierOneEnemyGear(ref EnemyStatBlock stats, ArenaEnemyArchetype archetype, ItemRarity gearRarity)
+    {
+        int gearTier = GetGearTier(gearRarity);
+
+        switch (archetype)
+        {
+            case ArenaEnemyArchetype.Gambler:
+                stats.strength += 4 + gearTier * 6;
+                stats.luck += 4 + gearTier * 6;
+                stats.rage += gearTier * 2;
+                stats.agility += gearTier * 2;
+                stats.endurance += gearTier * 4;
+                stats.armor += 2 + gearTier * 5;
+                break;
+
+            case ArenaEnemyArchetype.Duelist:
+                stats.strength += 4 + gearTier * 5;
+                stats.agility += 5 + gearTier * 7;
+                stats.reaction += 4 + gearTier * 6;
+                stats.endurance += gearTier * 3;
+                stats.armor += 2 + gearTier * 4;
+                break;
+
+            default:
+                stats.strength += 6 + gearTier * 6;
+                stats.rage += 4 + gearTier * 6;
+                stats.reaction += gearTier;
+                stats.endurance += 1 + gearTier * 5;
+                stats.armor += 3 + gearTier * 5;
+                break;
+        }
+    }
+
+    private int GetGearTier(ItemRarity gearRarity)
+    {
+        switch (gearRarity)
+        {
+            case ItemRarity.Epic:
+                return 2;
+            case ItemRarity.Rare:
+                return 1;
+            default:
+                return 0;
+        }
+    }
+
+    private void ScaleEnemyStats(ref EnemyStatBlock stats, float statScale)
+    {
+        stats.strength = Mathf.Max(Mathf.RoundToInt(stats.strength * statScale), 1);
+        stats.rage = Mathf.Max(Mathf.RoundToInt(stats.rage * statScale), 0);
+        stats.reaction = Mathf.Max(Mathf.RoundToInt(stats.reaction * statScale), 1);
+        stats.agility = Mathf.Max(Mathf.RoundToInt(stats.agility * statScale), 1);
+        stats.endurance = Mathf.Max(Mathf.RoundToInt(stats.endurance * statScale), 1);
+        stats.armor = Mathf.Max(Mathf.RoundToInt(stats.armor * statScale), 0);
+        stats.luck = Mathf.Max(Mathf.RoundToInt(stats.luck * statScale), 0);
+        stats.intelligence = Mathf.Max(Mathf.RoundToInt(stats.intelligence * statScale), 1);
+    }
+
+    private int CalculateHpFromEndurance(int enduranceValue)
+    {
+        return 100 + Mathf.Max(enduranceValue, 1) * 10;
+    }
+
+    private int CalculateAttack(int strengthValue, int rageValue, int combatPowerValue)
+    {
+        return Mathf.Max(strengthValue * 2 + rageValue + combatPowerValue / 70, 1);
+    }
+
+    private int CalculateCombatPower(
+        int levelValue,
+        int strengthValue,
+        int rageValue,
+        int reactionValue,
+        int agilityValue,
+        int enduranceValue,
+        int armorValue,
+        int luckValue,
+        int intelligenceValue)
+    {
+        return Mathf.Max(
+            levelValue * 100 +
+            strengthValue * 10 +
+            rageValue * 8 +
+            reactionValue * 8 +
+            agilityValue * 8 +
+            enduranceValue * 10 +
+            armorValue * 5 +
+            luckValue * 6 +
+            intelligenceValue * 8,
+            1);
+    }
+
+    private float CalculateCritChance(int rageValue, int luckValue)
+    {
+        return Mathf.Clamp(5f + luckValue * 0.15f + rageValue * 0.05f, 2f, 45f);
+    }
+
+    private int CalculateTokenReward(ArenaEnemyDifficulty difficulty, int enemyLevel, int enemyPower)
+    {
+        int baseReward;
+
         switch (difficulty)
         {
             case ArenaEnemyDifficulty.Easy:
-                return "A lower-ranked challenger looking for a mistake to punish. Safer fight, lower reward.";
+                baseReward = 10;
+                break;
             case ArenaEnemyDifficulty.Hard:
-                return "A dangerous Arena favorite with enough force to punish weak stance choices. High risk, high reward.";
+                baseReward = 30;
+                break;
             default:
-                return "A close match for your current strength. A fair duel with solid Arena rewards.";
+                baseReward = 18;
+                break;
+        }
+
+        int levelReward = enemyLevel * (difficulty == ArenaEnemyDifficulty.Hard ? 4 : 3);
+        int powerReward = Mathf.RoundToInt(enemyPower / 260f);
+
+        return Mathf.Max(baseReward + levelReward + powerReward, 8);
+    }
+
+    private string BuildEnemyGearSummary(ArenaEnemyArchetype archetype, ItemRarity gearRarity)
+    {
+        return "Tier 1 " + gearRarity + " " + GetArchetypeLabel(archetype) + " gear style";
+    }
+
+    private string GetArchetypeLabel(ArenaEnemyArchetype archetype)
+    {
+        switch (archetype)
+        {
+            case ArenaEnemyArchetype.Gambler:
+                return "Strength + Luck";
+            case ArenaEnemyArchetype.Duelist:
+                return "Agility + Reaction";
+            default:
+                return "Strength + Rage";
+        }
+    }
+
+    private string BuildEnemyDescription(ArenaEnemyDifficulty difficulty, ArenaEnemyArchetype archetype)
+    {
+        string archetypeText = GetArchetypeLabel(archetype);
+
+        switch (difficulty)
+        {
+            case ArenaEnemyDifficulty.Easy:
+                return "A lower-ranked " + archetypeText + " challenger looking for a mistake to punish. Safer fight, lower reward.";
+            case ArenaEnemyDifficulty.Hard:
+                return "A dangerous " + archetypeText + " Arena favorite with enough force to punish weak stance choices. High risk, high reward.";
+            default:
+                return "A close " + archetypeText + " match for your current strength. A fair duel with solid Arena rewards.";
         }
     }
 

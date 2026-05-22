@@ -6,6 +6,7 @@ using UnityEngine;
 public static class PlayerSaveManager
 {
     private const string SaveFileName = "arena_player_progression.json";
+    public const int FreshNewPlayerArenaTokens = 0;
 
     [Serializable]
     public class PlayerProgressionSaveData
@@ -203,6 +204,39 @@ public static class PlayerSaveManager
             return saveData;
 
         return new PlayerProgressionSaveData();
+    }
+
+    public static void ResetToFreshNewPlayerSave()
+    {
+        PlayerProgressionSaveData saveData = CreateFreshNewPlayerSaveData(FreshNewPlayerArenaTokens);
+        WriteSaveData(saveData);
+
+        Debug.Log("PlayerSaveManager: Reset player save to fresh new player state.");
+    }
+
+    private static PlayerProgressionSaveData CreateFreshNewPlayerSaveData(int starterArenaTokens)
+    {
+        return new PlayerProgressionSaveData
+        {
+            level = 1,
+            currentExp = 0,
+            maxExp = 100,
+            availableStatPoints = 0,
+            arenaTokens = Mathf.Max(starterArenaTokens, 0),
+            allocatedStrength = 0,
+            allocatedRage = 0,
+            allocatedReaction = 0,
+            allocatedAgility = 0,
+            allocatedEndurance = 0,
+            allocatedArmor = 0,
+            allocatedLuck = 0,
+            allocatedIntelligence = 0,
+            selectedArenaStance = "Standard",
+            towerUnlockedFloor = 1,
+            towerClearedFloors = new List<int>(),
+            inventoryItems = new List<SavedInventoryItem>(),
+            equipment = new SavedEquipment()
+        };
     }
 
     private static List<int> SanitizeTowerClearedFloors(List<int> clearedFloors)

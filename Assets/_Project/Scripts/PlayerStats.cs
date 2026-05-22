@@ -317,6 +317,69 @@ public class PlayerStats : MonoBehaviour
         PlayerSaveManager.ClearSave();
     }
 
+    [ContextMenu("Dev Reset To Fresh New Player")]
+    public void DevResetToFreshNewPlayer()
+    {
+        PlayerSaveManager.ResetToFreshNewPlayerSave();
+        LoadProgression();
+        EnsureValidProgressionValues();
+        SyncAvailableStatPointsWithLevel();
+        RecalculateStats();
+
+        PlayerInventory inventory = null;
+        PlayerInventory[] inventories = Resources.FindObjectsOfTypeAll<PlayerInventory>();
+        foreach (PlayerInventory playerInventory in inventories)
+        {
+            if (playerInventory == null || !playerInventory.gameObject.scene.IsValid())
+                continue;
+
+            inventory = playerInventory;
+            break;
+        }
+
+        EquipmentManager equipmentManager = null;
+
+        EquipmentManager[] managers = Resources.FindObjectsOfTypeAll<EquipmentManager>();
+        foreach (EquipmentManager manager in managers)
+        {
+            if (manager == null || !manager.gameObject.scene.IsValid())
+                continue;
+
+            if (manager.playerStats == this)
+            {
+                equipmentManager = manager;
+                break;
+            }
+        }
+
+        if (inventory != null)
+            inventory.ownedItems.Clear();
+
+        if (equipmentManager != null)
+            equipmentManager.RestoreEquipmentFromSave(new PlayerSaveManager.SavedEquipment(), inventory);
+
+        currentHp = maxHp;
+        currentMp = maxMp;
+
+        PlayerProfileUI profileUI = FindFirstObjectByType<PlayerProfileUI>();
+        if (profileUI != null)
+            profileUI.RefreshProfile();
+
+        PlayerBarsUI barsUI = FindFirstObjectByType<PlayerBarsUI>();
+        if (barsUI != null)
+            barsUI.RefreshBars();
+
+        PlayerStatsWindowUI statsWindowUI = FindFirstObjectByType<PlayerStatsWindowUI>();
+        if (statsWindowUI != null)
+            statsWindowUI.Refresh();
+
+        CharacterPanelStatsViewUI characterStatsView = FindFirstObjectByType<CharacterPanelStatsViewUI>();
+        if (characterStatsView != null)
+            characterStatsView.Refresh();
+
+        Debug.Log("PlayerStats: Dev reset applied to fresh new player state.");
+    }
+
     private void LoadProgression()
     {
         if (!PlayerSaveManager.TryLoad(out PlayerSaveManager.PlayerProgressionSaveData saveData))

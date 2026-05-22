@@ -88,15 +88,18 @@ public class PlayerInventory : MonoBehaviour
     private void LoadInventoryAndEquipmentIfAvailable()
     {
         if (!PlayerSaveManager.TryLoad(out PlayerSaveManager.PlayerProgressionSaveData saveData))
-            return;
+        {
+            ClearSceneDefaultInventory();
+            EquipmentManager fallbackManager = GetEquipmentManager();
 
-        bool hasSavedInventory = saveData.inventoryItems != null && saveData.inventoryItems.Count > 0;
+            if (fallbackManager != null)
+                fallbackManager.RestoreEquipmentFromSave(new PlayerSaveManager.SavedEquipment(), this);
+
+            return;
+        }
 
         isLoadingFromSave = true;
-
-        if (hasSavedInventory)
-            LoadInventory(saveData.inventoryItems);
-
+        LoadInventory(saveData.inventoryItems);
         isLoadingFromSave = false;
 
         EquipmentManager manager = GetEquipmentManager();
@@ -104,13 +107,24 @@ public class PlayerInventory : MonoBehaviour
         if (manager != null)
             manager.RestoreEquipmentFromSave(saveData.equipment, this);
 
-        if (hasSavedInventory)
-            Debug.Log("PlayerInventory: Loaded " + ownedItems.Count + " inventory items from save.");
+        Debug.Log("PlayerInventory: Loaded " + ownedItems.Count + " inventory items from save.");
+    }
+
+    private void ClearSceneDefaultInventory()
+    {
+        if (ownedItems.Count <= 0)
+            return;
+
+        ownedItems.Clear();
+        Debug.Log("PlayerInventory: Cleared scene default inventory because no player save exists.");
     }
 
     private void LoadInventory(List<PlayerSaveManager.SavedInventoryItem> savedItems)
     {
         ownedItems.Clear();
+
+        if (savedItems == null)
+            return;
 
         HashSet<string> loadedInstanceIds = new HashSet<string>();
 
