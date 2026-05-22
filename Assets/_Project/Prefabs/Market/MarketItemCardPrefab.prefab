@@ -606,8 +606,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 621.453, y: 236}
+  m_AnchoredPosition: {x: -92.01129, y: 0}
+  m_SizeDelta: {x: 615.9774, y: 236}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &2093410292194719108
 CanvasRenderer:
@@ -687,7 +687,6 @@ MonoBehaviour:
   priceText: {fileID: 8262881983494051565}
   actionButton: {fileID: 2435822873693269382}
   actionButtonText: {fileID: 3353669927065779578}
-  actionButtonBackground: {fileID: 7986012184779555517}
 --- !u!1 &7191680372787866090
 GameObject:
   m_ObjectHideFlags: 0

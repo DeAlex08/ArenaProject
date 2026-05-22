@@ -15,6 +15,49 @@ The main scene is `MainMenu`. It is not intended to be a static list of menu but
 
 Git and GitHub workflow is active for the project.
 
+## ArenaProject Current State Summary
+
+ArenaProject is a Unity dark fantasy mobile-style RPG vertical slice built through architecture-first development.
+
+Core development principle:
+
+- do not redesign working systems without an explicit request
+- do not replace core systems unless explicitly requested
+- all new systems should extend existing architecture
+- preserve save compatibility
+- preserve UI flow
+- preserve the shared `CombatSimulator`
+- preserve the reusable PvE/PvP foundation
+
+Current priority:
+
+- combat depth
+- progression
+- RPG identity
+- equipment system
+- readable UI
+- editable UI workflow
+
+Not current priority:
+
+- final polish
+- production art
+- advanced VFX
+- optimization
+
+Working systems:
+
+- `MainMenu` city hub
+- Arena
+- Barracks
+- Market
+- Tower of Trials
+- Inventory
+- Equipment
+- Combat Playback
+- Save/load
+- Arena Tokens economy
+
 ## Current Scene State
 
 The current main gameplay scene is:
@@ -38,7 +81,7 @@ Current high-level UI structure:
 
 `MainLocationPanel` is the right-side city hub. It contains clickable/touchable building areas such as Barracks, Arena, Market, and Tower of Trials.
 
-## Current Project State After Combat Balance v1 And Tier 1 Market Gear
+## Current Project State After Combat Balance v1, Tier 1 Market Gear, And Editable Market UI
 
 The project currently compiles at the script level and the main gameplay loop is:
 
@@ -53,6 +96,8 @@ The project currently compiles at the script level and the main gameplay loop is
 - MarketWindow sells static Tier 1 Level 1-10 gear items and adds purchases to `PlayerInventory`
 - MarketWindow can sell unequipped player-owned items back for partial Arena Tokens
 - purchased Market items persist through the existing inventory/equipment save-load flow
+- MarketWindow now uses editable prefab-based UI references for item cards, category buttons, and Buy/Sell mode buttons
+- Market runtime code should only populate dynamic Market data and must not override manually edited prefab visuals
 - ArenaWindow opens from the city hub and shows three generated selectable enemies
 - Arena opponents are regenerated from current player combat power when ArenaWindow opens
 - Arena has a free `Refresh Opponents` button that regenerates the enemy list
@@ -97,7 +142,7 @@ Current known limitations:
 - save format has no version/migration field yet
 - item persistence depends on every real item having a stable `ItemData.itemId`
 - inventory/equipment persistence covers owned items and equipped slots, but not generated loot tables, shops, or item affixes yet
-- MarketWindow v2 is functional and now uses the static Tier 1 Level 1-10 gear pool, but still needs visual polish against BarracksWindow
+- MarketWindow v2 is functional, uses the static Tier 1 Level 1-10 gear pool, and is moving toward manual prefab-driven visual editing
 - no loot drop system exists yet
 - no procedural item generation exists yet
 - Tower currently rewards only EXP and Arena Tokens
@@ -106,7 +151,7 @@ Current known limitations:
 - EnemyPanel uses a custom fantasy frame and orc portrait, but HP/MP alignment still needs later polish
 - player combat stance selection exists and persists, but stance choice is still a simple ArenaWindow control with no deeper character build integration yet
 - shield blocking is supported in code but no shield item type/data exists yet
-- Defense still exists in current combat code and enemy data, but the long-term design direction is to remove Defense and make body-zone Armor the main mitigation stat
+- Defense is removed conceptually from the long-term combat model; Armor is the defensive stat direction
 - Arena enemies are generated from current player combat power, but are not saved yet
 - Arena rank progression is intentionally not implemented yet
 
@@ -255,11 +300,50 @@ Current Market v2 features:
 - currently equipped items are protected from accidental sale
 - insufficient currency shows a simple MarketWindow message instead of opening another confirmation window
 
+Editable Market UI status:
+
+- Market UI was refactored into a prefab-driven editable workflow
+- current editable prefabs:
+  - `MarketItemCardPrefab`
+  - `MarketCategoryButtonPrefab`
+  - `MarketModeButtonPrefab`
+- `MarketWindowUI` uses serialized editable references when they exist
+- `MarketUiPrefabBuilder` exists only as an explicit editor menu rebuild tool:
+  - `ArenaProject > Build Editable Market UI`
+- Play Mode must use assigned editable prefabs and must not rebuild/overwrite Market visuals
+
+Critical Market UI rule:
+
+- runtime code may only set dynamic content:
+  - item icon sprite
+  - item name text
+  - rarity/meta text
+  - stats text
+  - price text
+  - button label text
+  - button click handlers
+  - button interactable state
+- runtime code must not:
+  - resize UI
+  - move UI
+  - recolor UI
+  - replace button/background sprites
+  - override typography
+  - override spacing/layout
+  - override prefab visuals
+  - change anchors/pivots/positions/sizes
+
+Important editable UI note:
+
+- Market selected/highlight visuals should not be hardcoded through runtime `Image.color`
+- if selected/highlight state is needed, implement it later through predefined serialized prefab children, such as a `SelectedFrame`, and only toggle those objects on/off
+- manual Unity Inspector/Canvas edits to Market prefabs must be preserved in Play Mode
+
 Important Market notes:
 
 - existing saved players can acquire Tier 1 gear through Market without resetting saves or injecting items into save data
 - the current Market is functional and should not be removed while polishing visuals
-- future work should make Market cards visually closer to Barracks item cards
+- future Market visual work should happen through editable prefabs and scene hierarchy, not runtime layout code
 
 ### Gear Progression Design
 
@@ -284,10 +368,22 @@ Current implemented gear band:
 
 Important gear direction:
 
+- itemization should support specialization and meaningful opportunity cost
+- specializing should generally be stronger than leveling every stat evenly
+- hybrid builds should exist, but should trade peak power for flexibility
+- current starter archetypes:
+  - Strength + Rage: crit/burst fighter
+  - Strength + Luck: lucky hit / block bypass fighter
+  - Agility + Reaction: dodge/counter fighter
+- Endurance acts as a universal smaller stat and survivability support stat
+- armor pieces should provide Armor plus archetype stats
+- weapons should provide attack-related power plus archetype stats
+- accessories should not provide armor or attack; they should compensate with stronger stats, hybrid stats, and future unique modifiers
 - do not add Legendary or Mythic item effects until explicitly requested
 - do not add procedural loot yet
 - do not add percent modifiers until explicitly requested
 - future percent modifier candidates include CritDamageBonusPercent, LuckyDodgeBypassBonusPercent, ReactionDamageBonusPercent, and DodgeBypassResistPercent
+- future unique modifier candidates include armor penetration, anti-dodge, anti-crit, stun chance, lifesteal, retaliation modifiers, and similar build-defining effects
 - future higher gear bands should build on the same static item pool approach first, before procedural item generation
 
 ### TowerWindow
@@ -369,6 +465,20 @@ Responsibilities:
 - calculate dodge, block, crit, lucky hit, armor mitigation, and terminal reaction retaliation
 - produce a full readable combat log
 
+Current combat model:
+
+- combat is simultaneous round combat
+- current attack resolution flow is:
+  - zone -> damage -> crit/lucky -> dodge -> block -> armor -> HP -> reaction
+- current combat stats:
+  - Strength
+  - Rage
+  - Luck
+  - Agility
+  - Reaction
+  - Endurance
+  - Armor
+
 Important behavior:
 
 - max fight duration is 20 rounds
@@ -394,8 +504,13 @@ Important behavior:
 - Lucky Crit is supported
 - Block fully negates damage when it succeeds
 - Reaction is terminal retaliation damage and cannot trigger dodge, block, another reaction, or an infinite chain
-- current armor mitigation is implemented in code and still includes Defense in the effective armor threshold
-- current design direction is to remove Defense later and make Armor the only mitigation stat
+- Armor is the defensive stat direction
+- old Defense is removed conceptually from the current combat design
+- current armor direction is flat damage reduction:
+  - `FinalDamage = max(0, IncomingDamage - Armor)`
+- there is no guaranteed minimum damage
+- weak attacks can deal 0 damage
+- no permanent invulnerability should be introduced
 - CombatSimulator does not apply rewards or save data directly
 - CombatSimulator returns structured playback events as calculation output, but does not play visuals
 - `ArenaWindowUI` remains responsible for UI flow and reward application
@@ -411,17 +526,20 @@ Important behavior:
 
 Current combat design decision:
 
-- remove Defense as a long-term combat stat
-- keep Armor by body zone
-- Armor should become the main mitigation stat
-- planned future mitigation formula:
-  - `FinalDamage = Damage * (1 - Armor / (Armor + 100))`
+- keep Defense out of the long-term combat stat model
+- keep Armor as the defensive mitigation stat
+- body zones remain useful for hit variety, equipment slots, and visual flavor
+- avoid permanent invulnerability while preserving the idea that weak attacks may deal 0 damage
+- future cleanup should keep combat pacing around:
+  - average fights: 4-8 rounds
+  - rare stalemates
+  - rare one-shots
 
 Important:
 
-- do not implement this formula until explicitly requested
-- for now, this is documented as the next combat cleanup direction only
-- avoid adding more features on top of Defense unless a short-term compatibility bridge is required
+- do not add features that depend on Defense unless a short-term compatibility bridge is required
+- do not replace `CombatSimulator`
+- continue extending the existing balance/calculation layer
 
 ### PlayerStats
 
@@ -1152,10 +1270,14 @@ Tower reuse rules:
 - Do not replace `CombatSimulator`.
 - Preserve the shared Arena/Tower combat flow.
 - Do not redesign `MarketWindow` architecture unless explicitly requested.
+- Do not break the editable Market UI workflow.
+- Do not generate runtime-only Market UI if editable prefabs exist.
+- Do not override editable prefab visuals in Play Mode.
 - Do not add procedural loot yet.
 - Do not add Legendary/Mythic item effects yet.
 - Do not add percent modifiers until explicitly requested.
 - Preserve save/load compatibility.
+- Prefer prefab-driven UI, reusable systems, maintainable hierarchy, and editable Canvas workflow.
 
 ## Important Bug Fix
 

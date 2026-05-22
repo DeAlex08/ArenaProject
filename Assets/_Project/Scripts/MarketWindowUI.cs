@@ -63,6 +63,7 @@ public class MarketWindowUI : MonoBehaviour
     private Sprite itemCardFrameSprite;
     private readonly List<CategoryButtonBinding> categoryButtons = new List<CategoryButtonBinding>();
 
+    private bool isUsingEditableUi;
     private MarketMode currentMode = MarketMode.Buy;
     private ItemType currentCategory = ItemType.Armor;
     private bool isProcessingTransaction;
@@ -199,6 +200,7 @@ public class MarketWindowUI : MonoBehaviour
 
     private void BuildWindow()
     {
+        isUsingEditableUi = false;
         ClearChildren(transform);
         categoryButtons.Clear();
 
@@ -241,6 +243,7 @@ public class MarketWindowUI : MonoBehaviour
 
     private void WireEditableWindow()
     {
+        isUsingEditableUi = true;
         content = itemCardContainer;
         categoryButtons.Clear();
 
@@ -447,12 +450,18 @@ public class MarketWindowUI : MonoBehaviour
 
     private void RefreshModeVisuals()
     {
+        if (isUsingEditableUi)
+            return;
+
         SetToggleVisual(buyModeBackground, buyModeText, currentMode == MarketMode.Buy);
         SetToggleVisual(sellModeBackground, sellModeText, currentMode == MarketMode.Sell);
     }
 
     private void RefreshCategoryVisuals()
     {
+        if (isUsingEditableUi)
+            return;
+
         foreach (CategoryButtonBinding binding in categoryButtons)
             SetToggleVisual(binding.background, binding.label, binding.itemType == currentCategory);
     }
